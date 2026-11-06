@@ -16,7 +16,7 @@ Everything runs on AWS, in one CDK stack.
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
 | Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
 | Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
-| Website | GitHub Pages | The Flutter web build, published by the **Deploy** workflow at sidekick.artifisi.com. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
+| Website | Cloudflare Pages | The Flutter web build, built by Cloudflare from this repo (`app/cloudflare-build.sh`) on every push, at sidekick.artifisi.com. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
 | Cost guard | AWS Budgets, Lambda concurrency cap, API throttling | Email alert at 50% of the monthly budget and when the forecast passes 100%. |
 
 ### Privacy rules (enforced in `backend/src/app.ts`, tested in `backend/test/app.test.ts`)
@@ -63,7 +63,7 @@ Do these once. Nothing here needs a Google Cloud billing account.
 2. **Repo settings.** GitHub repo → Settings → Secrets and variables → Actions:
    - Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`.
    - Variables: `GOOGLE_WEB_CLIENT_ID` (step 1.3) and `ALERT_EMAIL` (for the budget alert).
-3. **Run it.** Actions → **Deploy** → Run workflow. It bootstraps CDK on the first run, deploys the backend in ap-southeast-1, builds the Flutter web app with the new API settings and publishes it. The run summary lists the outputs, including `DeployRoleArn`. Confirm the AWS Budgets email it sends.
+3. **Run it.** Actions → **Deploy** → Run workflow. It bootstraps CDK on the first run, deploys the backend in ap-southeast-1. The run summary lists the outputs, including `DeployRoleArn`. Confirm the AWS Budgets email it sends.
 
 After that, every push to main that touches `app/` or `backend/` deploys again.
 
@@ -81,12 +81,16 @@ keytool -list -v -keystore sidekick-release.jks -alias sidekick   # shows the SH
 ```
 Keep the `.jks` file safe and out of git. For CI add the secrets `ANDROID_KEYSTORE_BASE64` (`base64 -w0 sidekick-release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. For local builds, write `app/android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. Put the SHA-1 on the Android OAuth client (step 1.4).
 
-### 6. sidekick.artifisi.com (GitHub Pages)
-1. Repo → Settings → **Pages** → Source: **GitHub Actions**. Under Custom domain enter `sidekick.artifisi.com` and save.
-2. In your DNS, point `sidekick` (CNAME) at `rajahafify.github.io`. On Cloudflare, set it to **DNS only** (grey cloud) so GitHub can issue the HTTPS certificate, then tick **Enforce HTTPS** in Pages once it's offered.
-3. Run **Deploy** (or push to main). For Android app links, also set the repo variable `ANDROID_CERT_SHA256` (step 5); the workflow writes `/.well-known/assetlinks.json`.
+### 6. The website: Cloudflare Pages + sidekick.artifisi.com
+1. Cloudflare dashboard → Workers & Pages → Create → Pages → **Connect to Git** → pick `rajahafify/sidekick`.
+2. Build settings: Framework preset **None**, Root directory `app`, Build command `bash cloudflare-build.sh`, Build output directory `build/web`.
+3. Environment variables (Production, and Preview if you want PR previews), from the Deploy run's outputs:
+   - `API_URL` = `ApiUrl`, `IDENTITY_POOL_ID` = `IdentityPoolId`, `GOOGLE_WEB_CLIENT_ID` = your Web client ID.
+   - Optional: `ANDROID_CERT_SHA256` (step 5) for Android app links.
+4. Save and Deploy. The first build takes a few minutes (it downloads Flutter).
+5. The project → Custom domains → add `sidekick.artifisi.com`. If the old Sidekick Pages project still owns that domain, remove it there first.
 
-The web app is then live at https://sidekick.artifisi.com, and Android opens `https://sidekick.artifisi.com/e/<id>` links straight in the installed app. (The stack also still creates a CloudFront site, `SiteUrl`; it's unused and costs next to nothing.)
+After that, every push to main rebuilds the site, and every PR gets a preview link. Add the `*.pages.dev` address as a JavaScript origin on the Google Web client if you want sign-in on previews. (The AWS stack also still creates a CloudFront site, `SiteUrl`; it's unused and costs next to nothing.)
 
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.

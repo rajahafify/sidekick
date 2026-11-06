@@ -1,7 +1,7 @@
 name: Deploy
 
-# Deploys everything: the AWS backend (API, data, sign-in), then the Flutter web app on GitHub Pages
-# at sidekick.artifisi.com (Settings → Pages → Source: GitHub Actions, custom domain). Runs on every push to main, or by hand from the Actions tab (Run workflow).
+# Deploys the AWS backend (API, data, sign-in, the sidekick). The website is built and hosted by
+# Cloudflare Pages straight from this repo (app/cloudflare-build.sh, README step 6). Runs on every push to main, or by hand from the Actions tab (Run workflow).
 #
 # Repo settings (Settings → Secrets and variables → Actions):
 #   secrets   AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY  an IAM admin access key, for the first run
@@ -12,7 +12,7 @@ name: Deploy
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'backend/**', '.github/workflows/deploy.yml']
+    paths: ['backend/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
 permissions:
@@ -119,59 +119,3 @@ jobs:
                   f.write(f'| {k} | `{v}` |\n')
           PY
 
-  web:
-    needs: backend
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
-    defaults:
-      run:
-        working-directory: app
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.9'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - name: App settings from the backend
-        env:
-          IDENTITY_POOL_ID: ${{ needs.backend.outputs.identity_pool_id }}
-          API_URL: ${{ needs.backend.outputs.api_url }}
-          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
-          SITE_URL: https://${{ vars.SITE_DOMAIN || 'sidekick.artifisi.com' }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          keys = ['AWS_REGION', 'IDENTITY_POOL_ID', 'API_URL', 'GOOGLE_WEB_CLIENT_ID', 'SITE_URL']
-          json.dump({k: os.environ[k] for k in keys if os.environ.get(k)}, open('env.json', 'w'))
-          PY
-      - run: flutter build web --release --no-web-resources-cdn --dart-define-from-file=env.json
-      - name: GitHub Pages extras
-        env:
-          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
-        run: |
-          cd build/web
-          touch .nojekyll            # serve .well-known as is
-          cp index.html 404.html     # app routes like /e/<id> load the app
-          mkdir -p .well-known
-          python3 - <<'PY'
-          import json, os
-          fps = [s.strip() for s in os.environ.get('ANDROID_CERT_SHA256', '').split(',') if s.strip()]
-          links = [{'relation': ['delegate_permission/common.handle_all_urls'],
-                    'target': {'namespace': 'android_app', 'package_name': 'com.artifisi.sidekick',
-                               'sha256_cert_fingerprints': fps}}] if fps else []
-          json.dump(links, open('.well-known/assetlinks.json', 'w'))
-          PY
-      - id: pages
-        uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: app/build/web
-      - uses: actions/deploy-pages@v4
