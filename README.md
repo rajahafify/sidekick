@@ -16,7 +16,7 @@ Everything runs on AWS, in one CDK stack.
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
 | Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
 | Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
-| Website | S3 + CloudFront | The Flutter web build, published by the **Deploy web** workflow. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
+| Website | S3 + CloudFront | The Flutter web build, published by the **Deploy** workflow. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
 | Cost guard | AWS Budgets, Lambda concurrency cap, API throttling | Email alert at 50% of the monthly budget and when the forecast passes 100%. |
 
 ### Privacy rules (enforced in `backend/src/app.ts`, tested in `backend/test/app.test.ts`)
@@ -50,43 +50,29 @@ Do these once. Nothing here needs a Google Cloud billing account.
 ### 1. Google sign-in (Google Cloud, free, no billing)
 1. In [Google Cloud console](https://console.cloud.google.com/), create a new project (for example `sidekick-auth`). **Don't link a billing account** and don't enable any APIs: sign-in doesn't need them.
 2. Google Auth Platform → Branding: app name **Sidekick** and your support email. Leave the logo off for now: a logo starts Google's brand verification. Audience: External. While the app is in **Testing**, add yourself and testers under Test users (up to 100).
-3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (and the `SiteUrl` from step 3 once you have it, plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
+3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (and the `SiteUrl` from the first deploy once you have it, plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
 4. Create another client → **Android**: package `com.artifisi.sidekick`, and the **SHA-1** of your release key (step 5). Add a second Android client with the debug key's SHA-1 if you want sign-in in debug builds (`cd app/android && ./gradlew signingReport`).
 
 ### 2. The sidekick's model
-**Now: OpenRouter (free).** Make a key at https://openrouter.ai/settings/keys, then store it in CloudShell (ap-southeast-1) before deploying:
+**Now: OpenRouter (free).** Make a key at https://openrouter.ai/settings/keys. It goes in GitHub as the `OPENROUTER_API_KEY` secret (step 3), and the deploy stores it in AWS SSM Parameter Store, never in the app. Without it the sidekick uses its template, so nothing breaks. Free models are rate limited and may log prompts, so this is for the pilot only.
 
-```sh
-aws ssm put-parameter --name /sidekick/openrouter-api-key --type SecureString --value '<your key>'
-```
+**Later: Bedrock.** Once AWS enables Bedrock on the account, open **Claude Haiku 5.5** in the Bedrock playground (us-east-1), fill in Anthropic's one-time form, then set the repo variable `LLM_PROVIDER` to `bedrock` and deploy again.
 
-To change it later, add `--overwrite`. Without the key the sidekick uses its template, so nothing breaks. Free models are rate limited and may log prompts, so this is for the pilot only.
+### 3. Deploy from GitHub
+1. **An AWS access key.** AWS console → IAM → Users → Create user `github-deploy` → Attach policies directly → `AdministratorAccess` → Create. Open the user → Security credentials → Create access key → "Third-party service" → copy both values.
+2. **Repo settings.** GitHub repo → Settings → Secrets and variables → Actions:
+   - Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`.
+   - Variables: `GOOGLE_WEB_CLIENT_ID` (step 1.3) and `ALERT_EMAIL` (for the budget alert).
+3. **Run it.** Actions → **Deploy** → Run workflow. It bootstraps CDK on the first run, deploys the backend in ap-southeast-1, builds the Flutter web app with the new API settings and publishes it. The run summary lists the outputs, including `SiteUrl` (add it as a JavaScript origin on the Web client) and `DeployRoleArn`. Confirm the AWS Budgets email it sends.
 
-**Later: Bedrock.** Once AWS enables Bedrock on the account, open **Claude Haiku 5.5** in the Bedrock playground (us-east-1), fill in Anthropic's one-time form, then redeploy with `-c llmProvider=bedrock`.
+After that, every push to main that touches `app/` or `backend/` deploys again.
 
-### 3. Deploy the backend (once, from CloudShell)
-Open **AWS CloudShell** (the `>_` icon in the AWS console), signed in as an admin of your account, in region **Asia Pacific (Singapore) ap-southeast-1**:
+**Optional, safer:** add `DeployRoleArn` as the secret `AWS_DEPLOY_ROLE_ARN`. The workflow then signs in with that role (GitHub OIDC, nothing stored) instead of the key, and you can delete the access key and the `github-deploy` user.
 
-```sh
-git clone https://github.com/rajahafify/sidekick && cd sidekick/backend
-npm ci
-npx cdk bootstrap
-npx cdk deploy -c googleClientId=<GOOGLE_WEB_CLIENT_ID> -c alertEmail=<your email>
-```
+Other settings, as repo variables: `MODEL_ID`, `SITE_DOMAIN`, `SITE_CERTIFICATE_ARN`, `ANDROID_CERT_SHA256`. For a manual deploy, `cd backend && npx cdk deploy -c googleClientId=...` also works (context keys: `monthlyBudgetUsd`, `llmProvider`, `modelId`, `bedrockRegion`, `placesCountries`, `githubRepo`, `githubOidcProviderArn`).
 
-It prints `ApiUrl`, `IdentityPoolId`, `Region`, `SiteUrl`, `SiteBucket`, `SiteDistributionId` and `DeployRoleArn`. Confirm the AWS Budgets email it sends. Other settings (`cdk.json` or `-c`): `monthlyBudgetUsd` (default 25), `llmProvider` (`openrouter`, or `bedrock`), `modelId` (default `openrouter/free`, or `global.anthropic.claude-haiku-5-5` on Bedrock), `bedrockRegion` (us-east-1), `placesCountries` (MYS), `githubRepo` (rajahafify/sidekick), and `githubOidcProviderArn` if your account already has a GitHub OIDC provider.
-
-After this, GitHub can deploy for you: `DeployRoleArn` is a role only this repo's workflows can use, with no stored AWS keys.
-
-### 4. Connect GitHub
-In the repo → Settings → Secrets and variables → Actions:
-- **Secret** `AWS_DEPLOY_ROLE_ARN` = `DeployRoleArn`.
-- **Variables** `AWS_REGION`, `IDENTITY_POOL_ID`, `API_URL`, `SITE_BUCKET`, `SITE_DISTRIBUTION_ID` (from the deploy output) and `GOOGLE_WEB_CLIENT_ID`. For the **Deploy backend** workflow also `ALERT_EMAIL`.
-
-Then:
-- **Website:** Actions → **Deploy web** → Run workflow. It builds the Flutter web app and publishes it at `SiteUrl` (and at sidekick.artifisi.com after step 6). It also runs on every push to main that changes the app.
-- **Android:** CI builds the APK on every push (Actions → CI → `sidekick-apk` artifact). For a local build, copy `app/env.example.json` to `app/env.json`, fill it in, and run `cd app && flutter build apk --release --dart-define-from-file=env.json`.
-- **Backend changes later:** Actions → **Deploy backend**, or `cdk deploy` again from CloudShell.
+### 4. Android builds
+CI builds the APK on every push (Actions → CI → `sidekick-apk` artifact). For a local build, copy `app/env.example.json` to `app/env.json`, fill it in with the deploy outputs, and run `cd app && flutter build apk --release --dart-define-from-file=env.json`.
 
 ### 5. Release signing key (Android)
 ```sh
@@ -97,7 +83,7 @@ Keep the `.jks` file safe and out of git. For CI add the secrets `ANDROID_KEYSTO
 
 ### 6. sidekick.artifisi.com
 1. ACM in **us-east-1**: request a certificate for `sidekick.artifisi.com` and validate it with the DNS record it gives you.
-2. Deploy again with `-c siteDomain=sidekick.artifisi.com -c siteCertificateArn=<arn> -c androidCertSha256=<SHA-256 from step 5>`.
+2. Add the repo variables `SITE_DOMAIN` = `sidekick.artifisi.com`, `SITE_CERTIFICATE_ARN` = the certificate ARN and `ANDROID_CERT_SHA256` = the SHA-256 from step 5, then run **Deploy** again.
 3. In your DNS, point `sidekick.artifisi.com` (CNAME) at the CloudFront domain from `SiteUrl`.
 
 The web app is then live at https://sidekick.artifisi.com, and Android opens `https://sidekick.artifisi.com/e/<id>` links straight in the installed app.
