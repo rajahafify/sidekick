@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../data/identity.dart';
@@ -6,6 +10,7 @@ import '../theme.dart';
 import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
 
+/// The welcome carousel from the last web version: the room, the picks, the match.
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
   @override
@@ -15,6 +20,27 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   String? busy;
   String? error;
+  int page = 0;
+  final _pages = PageController();
+  // Moves to the next slide on its own, like the web version did, until someone swipes.
+  late final Timer _auto = Timer.periodic(const Duration(seconds: 7), (_) {
+    if (_pages.hasClients) {
+      _pages.animateToPage((page + 1) % 3, duration: const Duration(milliseconds: 450), curve: Curves.easeInOut);
+    }
+  });
+
+  @override
+  void initState() {
+    super.initState();
+    _auto; // start the timer
+  }
+
+  @override
+  void dispose() {
+    _auto.cancel();
+    _pages.dispose();
+    super.dispose();
+  }
 
   Future<void> _run(String which, Future<void> Function() fn) async {
     setState(() {
@@ -30,93 +56,446 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     }
   }
 
-  static const _steps = [
-    ('Join the event', 'Scan the QR code or open the link. No host needed.'),
-    ('Your sidekick scouts', 'It reads who’s here and ranks who’s relevant to you, with a reason for each.'),
-    ('Connect or pass', 'Nobody sees who passed, or who connected with them before it’s mutual.'),
-    ('Match and swap contacts', 'When you both connect, you get each other’s contact and an opener.'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final session = SessionScope.of(context);
+    final slides = [
+      _Slide(
+        art: const _FigCard(label: 'THE ROOM', child: RoomViz()),
+        title: [Text('Stay in the talk.', style: displayStyle(42))],
+        rich: TextSpan(children: [
+          TextSpan(text: 'Your sidekick ', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
+          TextSpan(text: 'works the room.', style: displayStyle(42)),
+        ]),
+        text: 'Talks or networking? Have both. Your sidekick scouts everyone at the event while you listen.',
+      ),
+      _Slide(
+        art: const _Notes(),
+        title: [Text('It finds the people', style: displayStyle(42))],
+        rich: TextSpan(text: 'worth meeting', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
+        text: 'It reads what everyone is looking for and can offer, and tells you why each person is worth your time.',
+      ),
+      _Slide(
+        art: const _MatchArt(),
+        title: const [],
+        rich: TextSpan(children: [
+          TextSpan(text: 'Swipe. Match. ', style: displayStyle(42)),
+          TextSpan(text: 'Say hi.', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
+        ]),
+        text: 'Connect or pass. When you both connect, you swap contacts and get an opener for the break. Nobody sees who passed.',
+      ),
+    ];
+
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 40),
-              children: [
-                const Align(alignment: Alignment.centerLeft, child: Wordmark()),
-                const SizedBox(height: 64),
-                const Text('FOR PEOPLE WHO GO TO EVENTS', style: eyebrow),
-                const SizedBox(height: 16),
-                Text('Stay in the talk.', style: displayStyle(52)),
-                Text('Your sidekick', style: displayStyle(52, color: C.go, style: FontStyle.italic)),
-                Text('works the room.', style: displayStyle(52)),
-                const SizedBox(height: 22),
-                const Text(
-                  'At every event you have to choose: listen to the talks, or go network. Your sidekick scouts '
-                  'everyone in the room and lines up the people worth meeting. You swipe Connect or Pass. When you '
-                  'both connect, you swap contacts and get an opener for the break.',
-                  style: TextStyle(color: C.muted, fontSize: 17, height: 1.55),
-                ),
-                const SizedBox(height: 32),
-                GoogleButton(
-                  enabled: busy == null,
-                  onResult: (e) {
-                    if (e != null && mounted) setState(() => error = e is IdentityError ? e.message : '$e');
-                  },
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: busy != null ? null : () => _run('guest', session.continueAsGuest),
-                  child: busy == 'guest'
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
-                      : const Text('Continue as guest'),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Guests can check in and see who the sidekick picks. Sign in with Google to connect.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: C.muted, fontSize: 13),
-                ),
-                ErrorNote(error),
-                const SizedBox(height: 40),
-                const Divider(),
-                const SizedBox(height: 28),
-                for (final (i, (title, text)) in _steps.indexed)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 26),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: 48,
-                          child: Text('${i + 1}', style: displayStyle(34, color: C.go, style: FontStyle.italic)),
-                        ),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                            const SizedBox(height: 4),
-                            Text(text, style: const TextStyle(color: C.muted, fontSize: 15, height: 1.45)),
-                          ]),
-                        ),
-                      ],
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Center(child: Wordmark()),
+                  const SizedBox(height: 18),
+                  Expanded(
+                    child: ScrollConfiguration(
+                      // Let a mouse drag the slides too, not only touch.
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad},
+                      ),
+                      child: PageView(
+                      controller: _pages,
+                      onPageChanged: (i) => setState(() => page = i),
+                      children: slides,
+                      ),
                     ),
                   ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Both sides opt in. Contacts stay hidden until you match.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: C.muted, fontSize: 13),
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    for (var i = 0; i < slides.length; i++)
+                      GestureDetector(
+                        onTap: () => _pages.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: i == page ? 26 : 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: i == page ? C.go : C.line,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                      ),
+                  ]),
+                  const SizedBox(height: 18),
+                  GoogleButton(
+                    enabled: busy == null,
+                    onResult: (e) {
+                      if (e != null && mounted) setState(() => error = e is IdentityError ? e.message : '$e');
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: busy != null ? null : () => _run('guest', session.continueAsGuest),
+                    child: busy == 'guest'
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                        : const Text('Continue as guest'),
+                  ),
+                  ErrorNote(error),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Both sides opt in. Contacts stay hidden until you match.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: C.muted, fontSize: 13),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Slide extends StatelessWidget {
+  const _Slide({required this.art, required this.title, required this.rich, required this.text});
+  final Widget art;
+  final List<Widget> title;
+  final TextSpan rich;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: c.maxHeight),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                art,
+                const SizedBox(height: 30),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ...title,
+                  Text.rich(rich),
+                  const SizedBox(height: 14),
+                  Text(text, style: const TextStyle(color: C.muted, fontSize: 16.5, height: 1.5)),
+                ]),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+const _mono = TextStyle(fontFamily: 'monospace', fontSize: 11, color: C.muted, letterSpacing: 0.6);
+
+/// A figure card: "Fig 1" and a label on top, the drawing, and a caption the drawing provides.
+class _FigCard extends StatelessWidget {
+  const _FigCard({required this.label, required this.child});
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+        aspectRatio: 1.25,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0A),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: C.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(children: [
+            Positioned.fill(child: child),
+            const Positioned(left: 14, top: 12, child: Text('Fig 1', style: _mono)),
+            Positioned(right: 14, top: 12, child: Text(label, style: _mono)),
+          ]),
+        ),
+      );
+}
+
+/// A talk in progress, drawn as an isometric line model: a stage and screen at the back, 24 seats
+/// with an agent above each, and the agents' notes travelling between them. Orange links are the
+/// people worth meeting.
+class RoomViz extends StatefulWidget {
+  const RoomViz({super.key});
+  @override
+  State<RoomViz> createState() => _RoomVizState();
+}
+
+class _RoomVizState extends State<RoomViz> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) {
+          final met = (_RoomPainter.hops.length * _c.value).floor();
+          final toMeet = _RoomPainter.hops.take(met).where((h) => h.$3).length;
+          return Stack(children: [
+            Positioned.fill(child: CustomPaint(painter: _RoomPainter(_c.value))),
+            Positioned(
+              right: 14,
+              bottom: 12,
+              child: Text('${math.min(24, met + 1)} of 24 agents met · $toMeet to meet', style: _mono),
+            ),
+          ]);
+        },
+      );
+}
+
+class _RoomPainter extends CustomPainter {
+  _RoomPainter(this.t);
+  final double t;
+
+  static const cols = 6, rows = 4;
+  // Your agent sits at seat 9. Each hop: from, to, and whether that person is worth meeting.
+  static const you = 9;
+  static const hops = [
+    (9, 2, false), (2, 15, false), (15, 20, true), (20, 11, false), (11, 4, false),
+    (4, 17, false), (17, 22, false), (22, 13, true), (13, 6, false), (6, 0, false),
+    (0, 19, false), (19, 9, false),
+  ];
+
+  late Size _s;
+  late double _u;
+
+  /// Isometric projection of a point on the floor (gx along the rows, gy towards the back), lifted by z.
+  Offset iso(double gx, double gy, [double z = 0]) {
+    final cx = _s.width * 0.5, cy = _s.height * 0.6;
+    return Offset(cx - (gx - gy) * _u * 0.87, cy + (gx + gy) * _u * 0.5 - z * _u);
+  }
+
+  Path quad(List<Offset> p) => Path()..addPolygon(p, true);
+
+  Offset seatPos(int i) {
+    final c = i % cols, r = i ~/ cols;
+    return Offset(-2.6 + c * 1.05, -0.6 + r * 1.05);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _s = size;
+    _u = size.width / 14.2;
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = C.ink.withValues(alpha: 0.55);
+    final faint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = C.ink.withValues(alpha: 0.22);
+    final fill = Paint()..color = const Color(0xFF0E0E0E);
+    final top = Paint()..color = const Color(0xFF161616);
+
+    // The floor slab, with a little thickness.
+    const x0 = -3.6, x1 = 3.4, y0 = -3.4, y1 = 3.8, h = 0.35;
+    final slabTop = [iso(x0, y0, h), iso(x1, y0, h), iso(x1, y1, h), iso(x0, y1, h)];
+    final front = [iso(x1, y0, h), iso(x1, y1, h), iso(x1, y1), iso(x1, y0)];
+    final side = [iso(x0, y1, h), iso(x1, y1, h), iso(x1, y1), iso(x0, y1)];
+    for (final f in [front, side]) {
+      canvas.drawPath(quad(f), fill);
+      canvas.drawPath(quad(f), line);
+    }
+    canvas.drawPath(quad(slabTop), top);
+    canvas.drawPath(quad(slabTop), line);
+
+    // The stage along the back, the speaker, and the screen standing behind.
+    final st = [iso(-3.3, -3.1, h + 0.3), iso(3.1, -3.1, h + 0.3), iso(3.1, -1.7, h + 0.3), iso(-3.3, -1.7, h + 0.3)];
+    canvas.drawPath(quad([iso(3.1, -3.1, h + 0.3), iso(3.1, -1.7, h + 0.3), iso(3.1, -1.7, h), iso(3.1, -3.1, h)]), fill);
+    canvas.drawPath(quad([iso(-3.3, -1.7, h + 0.3), iso(3.1, -1.7, h + 0.3), iso(3.1, -1.7, h), iso(-3.3, -1.7, h)]), fill);
+    canvas.drawPath(quad([iso(-3.3, -1.7, h + 0.3), iso(3.1, -1.7, h + 0.3), iso(3.1, -1.7, h), iso(-3.3, -1.7, h)]), line);
+    canvas.drawPath(quad(st), top);
+    canvas.drawPath(quad(st), line);
+    final scr = [iso(-2.6, -3.0, h + 3.2), iso(1.2, -3.0, h + 3.2), iso(1.2, -3.0, h + 0.9), iso(-2.6, -3.0, h + 0.9)];
+    canvas.drawPath(quad(scr), fill);
+    canvas.drawPath(quad(scr), line);
+    for (var k = 0; k < 4; k++) {
+      final y = h + 2.7 - k * 0.38;
+      canvas.drawLine(iso(-2.2, -3.0, y), iso(-2.2 + (k == 0 ? 1.6 : 3.0 - k * 0.3), -3.0, y), faint);
+    }
+    for (final lx in [-2.2, 0.8]) {
+      canvas.drawLine(iso(lx, -3.0, h + 0.9), iso(lx, -3.0, h + 0.3), line);
+    }
+    _agent(canvas, iso(0.9, -2.3, h + 0.3), line, fill, glow: 0.4 + 0.3 * math.sin(t * math.pi * 24));
+
+    // Where the note is now.
+    final n = hops.length;
+    final f = t * n;
+    final hop = f.floor() % n;
+    final along = Curves.easeInOut.transform(f - f.floor());
+    final metSoFar = <int>{you};
+    final worth = <int>{};
+    for (var i = 0; i <= hop; i++) {
+      metSoFar.add(hops[i].$1);
+      if (i < hop || along > 0.95) {
+        metSoFar.add(hops[i].$2);
+        if (hops[i].$3) worth.add(hops[i].$2);
+      }
+    }
+
+    // Seats, back rows first so the front ones overlap them.
+    for (var i = 0; i < cols * rows; i++) {
+      final p = seatPos(i);
+      final g = Offset(p.dx, p.dy);
+      final a = [iso(g.dx - 0.3, g.dy - 0.3, h + 0.3), iso(g.dx + 0.3, g.dy - 0.3, h + 0.3), iso(g.dx + 0.3, g.dy + 0.3, h + 0.3), iso(g.dx - 0.3, g.dy + 0.3, h + 0.3)];
+      canvas.drawPath(quad([a[1], a[2], iso(g.dx + 0.3, g.dy + 0.3, h), iso(g.dx + 0.3, g.dy - 0.3, h)]), fill);
+      canvas.drawPath(quad([a[3], a[2], iso(g.dx + 0.3, g.dy + 0.3, h), iso(g.dx - 0.3, g.dy + 0.3, h)]), fill);
+      canvas.drawPath(quad([a[3], a[2], iso(g.dx + 0.3, g.dy + 0.3, h), iso(g.dx - 0.3, g.dy + 0.3, h)]), faint);
+      canvas.drawPath(quad(a), top);
+      canvas.drawPath(quad(a), line);
+      // Seat back.
+      canvas.drawPath(quad([iso(g.dx - 0.3, g.dy + 0.3, h + 0.3), iso(g.dx + 0.3, g.dy + 0.3, h + 0.3), iso(g.dx + 0.3, g.dy + 0.3, h + 0.85), iso(g.dx - 0.3, g.dy + 0.3, h + 0.85)]), fill);
+      canvas.drawPath(quad([iso(g.dx - 0.3, g.dy + 0.3, h + 0.3), iso(g.dx + 0.3, g.dy + 0.3, h + 0.3), iso(g.dx + 0.3, g.dy + 0.3, h + 0.85), iso(g.dx - 0.3, g.dy + 0.3, h + 0.85)]), line);
+      final isYou = i == you;
+      _agent(canvas, iso(g.dx, g.dy, h + 0.55), line, fill,
+          accent: isYou || worth.contains(i), glow: isYou ? 1 : (worth.contains(i) ? 0.8 : (metSoFar.contains(i) ? 0.25 : 0)));
+    }
+
+    // The note travelling between agents, with a dotted trail.
+    final (from, to, good) = hops[hop];
+    final pa = iso(seatPos(from).dx, seatPos(from).dy, h + 1.25);
+    final pb = iso(seatPos(to).dx, seatPos(to).dy, h + 1.25);
+    final mid = Offset((pa.dx + pb.dx) / 2, math.min(pa.dy, pb.dy) - _u * 1.4);
+    final path = Path()
+      ..moveTo(pa.dx, pa.dy)
+      ..quadraticBezierTo(mid.dx, mid.dy, pb.dx, pb.dy);
+    final m = path.computeMetrics().first;
+    final dot = Paint()..color = (good ? C.go : C.ink).withValues(alpha: 0.7);
+    for (var d = 0.0; d < m.length * along; d += 5) {
+      final tp = m.getTangentForOffset(d);
+      if (tp != null) canvas.drawCircle(tp.position, 0.9, dot);
+    }
+    final head = m.getTangentForOffset(m.length * along);
+    if (head != null) {
+      canvas.drawCircle(head.position, 2.6, Paint()..color = good ? C.go : C.ink);
+    }
+  }
+
+  /// A little capsule agent with a ring above it.
+  void _agent(Canvas canvas, Offset base, Paint line, Paint fill, {bool accent = false, double glow = 0}) {
+    final w = _u * 0.16, hgt = _u * 0.4;
+    final body = RRect.fromRectAndRadius(Rect.fromLTWH(base.dx - w, base.dy - hgt, w * 2, hgt), Radius.circular(w));
+    canvas.drawRRect(body, fill);
+    canvas.drawRRect(
+      body,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = accent ? C.go : C.ink.withValues(alpha: 0.5 + 0.5 * glow),
+    );
+    final ring = Rect.fromCenter(center: base.translate(0, -hgt - _u * 0.28), width: _u * 0.4, height: _u * 0.18);
+    canvas.drawOval(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = (accent ? C.go : C.ink).withValues(alpha: accent ? 0.9 : 0.15 + 0.5 * glow),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RoomPainter old) => old.t != t;
+}
+
+/// Slide 2: two notes from your sidekick about people in the room.
+class _Notes extends StatelessWidget {
+  const _Notes();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget note(String who, String text) => Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: C.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: C.line),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: C.soft, shape: BoxShape.circle, border: Border.all(color: C.line)),
+              child: Text(who, style: displayStyle(17, color: C.go, style: FontStyle.italic)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.only(left: 12),
+                decoration: const BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('YOUR SIDEKICK', style: eyebrow.copyWith(fontSize: 10.5)),
+                  const SizedBox(height: 4),
+                  Text(text, style: const TextStyle(fontSize: 15, height: 1.35)),
+                ]),
+              ),
+            ),
+          ]),
+        );
+    return AspectRatio(
+      aspectRatio: 1.25,
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Padding(padding: const EdgeInsets.only(right: 34), child: note('AR', 'Invests in seed fintech, and you’re raising.')),
+        const SizedBox(height: 12),
+        Padding(padding: const EdgeInsets.only(left: 34), child: note('DO', 'Needs engineers. You offer engineering help.')),
+      ]),
+    );
+  }
+}
+
+/// Slide 3: the match, and the opener your sidekick writes.
+class _MatchArt extends StatelessWidget {
+  const _MatchArt();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget circle(String t) => Container(
+          width: 96,
+          height: 96,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: C.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: C.go.withValues(alpha: 0.6), width: 1.5),
+            boxShadow: [BoxShadow(color: C.go.withValues(alpha: 0.12), blurRadius: 30)],
+          ),
+          child: Text(t, style: displayStyle(30, color: C.go, style: FontStyle.italic)),
+        );
+    return AspectRatio(
+      aspectRatio: 1.25,
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Text("IT'S A MATCH", style: eyebrow),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: 176,
+          height: 96,
+          child: Stack(children: [Positioned(left: 0, child: circle('AR')), Positioned(right: 0, child: circle('You'))]),
+        ),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          decoration: BoxDecoration(
+            color: C.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: C.line),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('OPENER', style: eyebrow.copyWith(fontSize: 10.5)),
+            const SizedBox(height: 4),
+            Text('“What made you start backing fintech?”', style: displayStyle(19)),
+          ]),
+        ),
+      ]),
     );
   }
 }

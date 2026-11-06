@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
 import '../data/api.dart';
@@ -349,27 +350,22 @@ class _EventScreenState extends State<EventScreen> {
       appBar: AppBar(
         // Opened from a link: there's nothing to go back to, so the wordmark goes home.
         automaticallyImplyLeading: false,
-        titleSpacing: 20,
-        title: Row(children: [
-          if (context.canPop())
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: () => context.pop(),
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              ),
-            ),
-          GestureDetector(onTap: () => context.go('/'), child: const Wordmark(size: 24)),
-        ]),
+        leadingWidth: 110,
+        // Opened from a link: there's nothing to go back to, so Back goes home.
+        leading: TextButton.icon(
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: C.ink),
+          label: const Text('Back', style: TextStyle(color: C.ink, fontSize: 17, fontWeight: FontWeight.w400)),
+        ),
         actions: [
           TextButton(
             onPressed: _shareSheet,
-            child: const Text('Share QR', style: TextStyle(color: C.muted, fontWeight: FontWeight.w500)),
+            child: const Text('Share', style: TextStyle(color: C.go, fontSize: 17, fontWeight: FontWeight.w400)),
           ),
           if (r.checkedIn) IconButton(onPressed: _menu, icon: const Icon(Icons.more_horiz, color: C.muted)),
           const SizedBox(width: 8),
         ],
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
       ),
       body: RefreshIndicator(
         color: C.go,
@@ -378,16 +374,31 @@ class _EventScreenState extends State<EventScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
           children: [
-            const SizedBox(height: 6),
-            Text(when.isEmpty ? 'HAPPENING NOW' : when, style: eyebrow),
+            const SizedBox(height: 16),
+            Text(when.isEmpty ? 'HAPPENING NOW' : when, style: eyebrow.copyWith(letterSpacing: 2.2)),
             const SizedBox(height: 10),
-            Text(e.name, style: displayStyle(40)),
+            Text(e.name, style: displayStyle(42)),
             const SizedBox(height: 8),
-            Text(
-              [if (e.place.isNotEmpty) e.place, '${r.count} checked in'].join(' · '),
-              style: const TextStyle(color: C.muted, fontSize: 15),
-            ),
-            const SizedBox(height: 20),
+            if (e.place.isNotEmpty)
+              GestureDetector(
+                onTap: () => launchUrl(
+                  Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': e.place}),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: '${e.place} '),
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Icon(Icons.north_east_rounded, size: 15, color: C.muted),
+                    ),
+                  ]),
+                  style: const TextStyle(color: C.muted, fontSize: 16),
+                ),
+              ),
+            const SizedBox(height: 4),
+            Text('${r.count} checked in', style: const TextStyle(color: C.muted, fontSize: 14)),
+            const SizedBox(height: 22),
             if (!r.checkedIn) ..._joinSection(r, phase) else ..._roomSection(r),
             ErrorNote(error),
           ],
@@ -414,7 +425,7 @@ class _EventScreenState extends State<EventScreen> {
           const SizedBox(height: 18),
           FilledButton(
             onPressed: busy || phase == EventPhase.ended ? null : _join,
-            child: busy ? const ButtonProgress() : Text(r.event.isPlace ? 'Check in here' : 'Check in'),
+            child: busy ? const ButtonProgress() : Text(r.event.isPlace ? 'Check in here' : "I'm at this event"),
           ),
         ],
       ),
@@ -465,10 +476,10 @@ class _EventScreenState extends State<EventScreen> {
       ),
       const SizedBox(height: 18),
       Container(
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.line))),
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.line)),
         child: Row(children: [
           _TabLabel(text: deck.isEmpty ? 'Scouted' : 'Scouted · ${deck.length}', on: tab == 0, onTap: () => setState(() => tab = 0)),
-          const SizedBox(width: 24),
           _TabLabel(
             text: myMatches.isEmpty ? 'Matches' : 'Matches · ${myMatches.length}',
             on: tab == 1,
@@ -844,15 +855,16 @@ class _TabLabel extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: on ? C.ink : Colors.transparent, width: 2)),
+  Widget build(BuildContext context) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: on ? C.soft : Colors.transparent, borderRadius: BorderRadius.circular(10)),
+            child: Text(text, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: on ? C.ink : C.muted)),
           ),
-          child: Text(text,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: on ? C.ink : C.muted)),
         ),
       );
 }

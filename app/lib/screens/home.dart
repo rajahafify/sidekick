@@ -173,6 +173,29 @@ class _EventsTabState extends State<EventsTab> {
               const SizedBox(height: 18),
               _GuestBanner(onSignIn: () => askToSignIn(context, reason: 'Sign in to connect with people you meet.')),
             ],
+            const SizedBox(height: 24),
+            SurfaceCard(
+              onTap: () => context.go('/places'),
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+              child: Row(children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(color: C.go.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: const Icon(Icons.my_location, color: C.go, size: 20),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Check in to a place', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+                    SizedBox(height: 2),
+                    Text("Coworking, café or venue. Meet who's there today.",
+                        style: TextStyle(color: C.muted, fontSize: 14, height: 1.35)),
+                  ]),
+                ),
+                const Icon(Icons.chevron_right, color: C.muted),
+              ]),
+            ),
             if (error != null) ErrorNote(error),
             const SizedBox(height: 32),
             SectionLabel(
@@ -247,7 +270,7 @@ class _EventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final live = !place2 && eventPhase(start, end) == EventPhase.live;
-    final sub = [place, if (place2) 'Check-ins today' else if (!live) eventWhen(start, end)]
+    final sub = [if (place2) 'Check-in' else place, if (!place2 && !live) eventWhen(start, end)]
         .where((x) => x.isNotEmpty)
         .join(' · ');
     return Padding(
@@ -259,9 +282,12 @@ class _EventRow extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                if (live) ...[
+                if (place2) ...[
+                  const Icon(Icons.my_location, color: C.go, size: 14),
+                  const SizedBox(width: 7),
+                ] else if (live) ...[
                   Container(width: 7, height: 7, decoration: const BoxDecoration(color: C.go, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                 ],
                 Flexible(
                   child: Text(name,
