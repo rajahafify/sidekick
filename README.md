@@ -16,7 +16,7 @@ Everything runs on AWS, in one CDK stack.
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
 | Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
 | Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
-| Website | S3 + CloudFront | The Flutter web build, published by the **Deploy** workflow. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
+| Website | GitHub Pages | The Flutter web build, published by the **Deploy** workflow at sidekick.artifisi.com. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
 | Cost guard | AWS Budgets, Lambda concurrency cap, API throttling | Email alert at 50% of the monthly budget and when the forecast passes 100%. |
 
 ### Privacy rules (enforced in `backend/src/app.ts`, tested in `backend/test/app.test.ts`)
@@ -50,7 +50,7 @@ Do these once. Nothing here needs a Google Cloud billing account.
 ### 1. Google sign-in (Google Cloud, free, no billing)
 1. In [Google Cloud console](https://console.cloud.google.com/), create a new project (for example `sidekick-auth`). **Don't link a billing account** and don't enable any APIs: sign-in doesn't need them.
 2. Google Auth Platform → Branding: app name **Sidekick** and your support email. Leave the logo off for now: a logo starts Google's brand verification. Audience: External. While the app is in **Testing**, add yourself and testers under Test users (up to 100).
-3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (and the `SiteUrl` from the first deploy once you have it, plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
+3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
 4. Create another client → **Android**: package `com.artifisi.sidekick`, and the **SHA-1** of your release key (step 5). Add a second Android client with the debug key's SHA-1 if you want sign-in in debug builds (`cd app/android && ./gradlew signingReport`).
 
 ### 2. The sidekick's model
@@ -63,7 +63,7 @@ Do these once. Nothing here needs a Google Cloud billing account.
 2. **Repo settings.** GitHub repo → Settings → Secrets and variables → Actions:
    - Secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `OPENROUTER_API_KEY`.
    - Variables: `GOOGLE_WEB_CLIENT_ID` (step 1.3) and `ALERT_EMAIL` (for the budget alert).
-3. **Run it.** Actions → **Deploy** → Run workflow. It bootstraps CDK on the first run, deploys the backend in ap-southeast-1, builds the Flutter web app with the new API settings and publishes it. The run summary lists the outputs, including `SiteUrl` (add it as a JavaScript origin on the Web client) and `DeployRoleArn`. Confirm the AWS Budgets email it sends.
+3. **Run it.** Actions → **Deploy** → Run workflow. It bootstraps CDK on the first run, deploys the backend in ap-southeast-1, builds the Flutter web app with the new API settings and publishes it. The run summary lists the outputs, including `DeployRoleArn`. Confirm the AWS Budgets email it sends.
 
 After that, every push to main that touches `app/` or `backend/` deploys again.
 
@@ -81,12 +81,12 @@ keytool -list -v -keystore sidekick-release.jks -alias sidekick   # shows the SH
 ```
 Keep the `.jks` file safe and out of git. For CI add the secrets `ANDROID_KEYSTORE_BASE64` (`base64 -w0 sidekick-release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. For local builds, write `app/android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. Put the SHA-1 on the Android OAuth client (step 1.4).
 
-### 6. sidekick.artifisi.com
-1. ACM in **us-east-1**: request a certificate for `sidekick.artifisi.com` and validate it with the DNS record it gives you.
-2. Add the repo variables `SITE_DOMAIN` = `sidekick.artifisi.com`, `SITE_CERTIFICATE_ARN` = the certificate ARN and `ANDROID_CERT_SHA256` = the SHA-256 from step 5, then run **Deploy** again.
-3. In your DNS, point `sidekick.artifisi.com` (CNAME) at the CloudFront domain from `SiteUrl`.
+### 6. sidekick.artifisi.com (GitHub Pages)
+1. Repo → Settings → **Pages** → Source: **GitHub Actions**. Under Custom domain enter `sidekick.artifisi.com` and save.
+2. In your DNS, point `sidekick` (CNAME) at `rajahafify.github.io`. On Cloudflare, set it to **DNS only** (grey cloud) so GitHub can issue the HTTPS certificate, then tick **Enforce HTTPS** in Pages once it's offered.
+3. Run **Deploy** (or push to main). For Android app links, also set the repo variable `ANDROID_CERT_SHA256` (step 5); the workflow writes `/.well-known/assetlinks.json`.
 
-The web app is then live at https://sidekick.artifisi.com, and Android opens `https://sidekick.artifisi.com/e/<id>` links straight in the installed app.
+The web app is then live at https://sidekick.artifisi.com, and Android opens `https://sidekick.artifisi.com/e/<id>` links straight in the installed app. (The stack also still creates a CloudFront site, `SiteUrl`; it's unused and costs next to nothing.)
 
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.
