@@ -102,85 +102,93 @@ DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
   };
 }
 
-/// The Sidekick mark: a domino mask with a wink. The left eye is open; the right eye is a
-/// sparkle (your sidekick spotted someone). Drawn on a 200 x 200 artboard; the mask spans
-/// x 14..186 and y 56..136.
-const _maskOutline =
-    'M14 96 C24 64 66 56 100 70 C134 56 176 64 186 96 C178 128 146 138 120 122 C111 116 105 115 100 120 '
-    'C95 115 89 116 80 122 C54 138 22 128 14 96Z';
-const _leftEye = 'M40 98 C46 84 70 80 84 92 C78 106 52 110 40 98Z';
-const _rightEye = 'M160 98 C154 84 130 80 116 92 C122 106 148 110 160 98Z';
-const _spark = 'M138 76 C140 88 143 91 155 93 C143 95 140 98 138 110 C136 98 133 95 121 93 C133 91 136 88 138 76Z';
-const _art = Rect.fromLTRB(14, 56, 186, 136);
+enum BuddyMood { normal, wink, happy }
 
-/// Width / height of the mark.
-const markAspect = 172 / 80;
+/// Width / height of Buddy.
+const markAspect = 152 / 133;
 
-/// Parses the absolute M / C / Z path data used above.
-Path _svg(String d, Rect box) {
-  final sx = box.width / _art.width, sy = box.height / _art.height;
-  final t = RegExp(r'[MCZ]|-?\d+(\.\d+)?').allMatches(d).map((m) => m.group(0)!).toList();
-  final p = Path();
-  var i = 0;
-  double n() => double.parse(t[i++]);
-  Offset pt() {
-    final x = n(), y = n();
-    return Offset(box.left + (x - _art.left) * sx, box.top + (y - _art.top) * sy);
-  }
-
-  String cmd = 'M';
-  while (i < t.length) {
-    if (RegExp(r'^[MCZ]$').hasMatch(t[i])) cmd = t[i++];
-    if (cmd == 'Z') {
-      p.close();
-      continue;
-    }
-    if (cmd == 'M') {
-      final a = pt();
-      p.moveTo(a.dx, a.dy);
-      cmd = 'C';
-    } else {
-      final a = pt(), b = pt(), c = pt();
-      p.cubicTo(a.dx, a.dy, b.dx, b.dy, c.dx, c.dy);
-    }
-  }
-  return p;
-}
-
-/// The mask with its eye holes. With [wink], the right eye is left closed for the sparkle.
-Path maskPath(Rect box, {bool wink = true}) {
-  final p = _svg(_maskOutline, box)..addPath(_svg(_leftEye, box), Offset.zero);
-  if (!wink) p.addPath(_svg(_rightEye, box), Offset.zero);
-  return p..fillType = PathFillType.evenOdd;
-}
-
-Path sparkPath(Rect box) => _svg(_spark, box);
-
-/// The mark. [size] is its height. The sparkle takes [sparkColor]; without one, both eyes are open.
+/// Buddy, the Sidekick mascot: a round robot head with a visor, orange eyes and an antenna.
+/// [size] is its height. It winks when it has spotted someone and smiles on a match.
 class SidekickMark extends StatelessWidget {
-  const SidekickMark({super.key, this.size = 20, this.color = C.ink, this.sparkColor = C.go});
+  const SidekickMark({
+    super.key,
+    this.size = 20,
+    this.color = C.ink,
+    this.visor = C.paper,
+    this.eyes = C.go,
+    this.mood = BuddyMood.normal,
+  });
   final double size;
   final Color color;
-  final Color? sparkColor;
+  final Color visor;
+  final Color eyes;
+  final BuddyMood mood;
+
   @override
   Widget build(BuildContext context) => SizedBox(
     width: size * markAspect,
     height: size,
-    child: CustomPaint(painter: _MarkPainter(color, sparkColor)),
+    child: CustomPaint(
+      painter: BuddyPainter(color: color, visor: visor, eyes: eyes, mood: mood),
+    ),
   );
 }
 
-class _MarkPainter extends CustomPainter {
-  _MarkPainter(this.color, this.spark);
-  final Color color;
-  final Color? spark;
+class BuddyPainter extends CustomPainter {
+  BuddyPainter({required this.color, required this.visor, required this.eyes, required this.mood});
+  final Color color, visor, eyes;
+  final BuddyMood mood;
+
+  // Drawn on a 200 x 200 artboard; Buddy spans x 24..176, y 27..160.
+  static const art = Rect.fromLTRB(24, 27, 176, 160);
+
   @override
   void paint(Canvas canvas, Size s) {
-    final box = Offset.zero & s;
-    canvas.drawPath(maskPath(box, wink: spark != null), Paint()..color = color);
-    if (spark != null) canvas.drawPath(sparkPath(box), Paint()..color = spark!);
+    canvas.save();
+    canvas.scale(s.width / art.width, s.height / art.height);
+    canvas.translate(-art.left, -art.top);
+    final body = Paint()..color = color;
+    RRect r(double x, double y, double w, double h, double rad) =>
+        RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), Radius.circular(rad));
+    // Antenna.
+    canvas.drawLine(
+      const Offset(100, 44),
+      const Offset(100, 62),
+      Paint()
+        ..color = color
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(const Offset(100, 38), 11, Paint()..color = eyes);
+    // Ears, head, visor.
+    canvas.drawRRect(r(24, 96, 14, 30, 7), body);
+    canvas.drawRRect(r(162, 96, 14, 30, 7), body);
+    canvas.drawRRect(r(38, 60, 124, 100, 40), body);
+    canvas.drawRRect(r(54, 80, 92, 52, 24), Paint()..color = visor);
+    // Eyes.
+    final eye = Paint()..color = eyes;
+    final arc = Paint()
+      ..color = eyes
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round;
+    Path smile(double x) => Path()
+      ..moveTo(x - 9, 110)
+      ..quadraticBezierTo(x, 98, x + 9, 110);
+    if (mood == BuddyMood.happy) {
+      canvas.drawPath(smile(79), arc);
+    } else {
+      canvas.drawRRect(r(72, 94, 14, 24, 7), eye);
+    }
+    if (mood == BuddyMood.normal) {
+      canvas.drawRRect(r(114, 94, 14, 24, 7), eye);
+    } else {
+      canvas.drawPath(smile(121), arc);
+    }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_MarkPainter old) => old.color != color || old.spark != spark;
+  bool shouldRepaint(BuddyPainter old) =>
+      old.color != color || old.visor != visor || old.eyes != eyes || old.mood != mood;
 }

@@ -8,6 +8,7 @@ import '../logic/sidekick.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/dots.dart';
 import '../widgets/ui.dart';
 
 /// A match: their contact details, and what the two sidekicks said about why you should talk.
@@ -112,7 +113,13 @@ class _MatchScreenState extends State<MatchScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               children: [
-                const Text("IT'S A MATCH", style: eyebrow),
+                const Row(
+                  children: [
+                    SidekickMark(size: 16, mood: BuddyMood.happy),
+                    SizedBox(width: 8),
+                    Text("IT'S A MATCH", style: eyebrow),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 Avatar(name: d.person.displayName, url: d.person.photoURL, size: 84),
                 const SizedBox(height: 16),
