@@ -1,7 +1,7 @@
 name: Deploy
 
-# Deploys everything: the AWS backend (API, data, sign-in, website hosting), then the Flutter web app
-# at the site. Runs on every push to main, or by hand from the Actions tab (Run workflow).
+# Deploys the AWS backend (API, data, sign-in, the sidekick). The website is built and hosted by
+# Cloudflare Pages straight from this repo (app/cloudflare-build.sh, README step 6). Runs on every push to main, or by hand from the Actions tab (Run workflow).
 #
 # Repo settings (Settings → Secrets and variables → Actions):
 #   secrets   AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY  an IAM admin access key, for the first run
@@ -12,7 +12,7 @@ name: Deploy
 on:
   push:
     branches: [main]
-    paths: ['app/**', 'backend/**', '.github/workflows/deploy.yml']
+    paths: ['backend/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
 permissions:
@@ -119,59 +119,3 @@ jobs:
                   f.write(f'| {k} | `{v}` |\n')
           PY
 
-  web:
-    needs: backend
-    runs-on: ubuntu-latest
-    environment: production
-    defaults:
-      run:
-        working-directory: app
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.47.9'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - name: App settings from the backend
-        env:
-          IDENTITY_POOL_ID: ${{ needs.backend.outputs.identity_pool_id }}
-          API_URL: ${{ needs.backend.outputs.api_url }}
-          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
-          SITE_URL: ${{ vars.SITE_DOMAIN && format('https://{0}', vars.SITE_DOMAIN) || 'https://sidekick.artifisi.com' }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          keys = ['AWS_REGION', 'IDENTITY_POOL_ID', 'API_URL', 'GOOGLE_WEB_CLIENT_ID', 'SITE_URL']
-          json.dump({k: os.environ[k] for k in keys if os.environ.get(k)}, open('env.json', 'w'))
-          PY
-      - run: flutter build web --release --no-web-resources-cdn --dart-define-from-file=env.json
-      - if: env.USE_ROLE == 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          mask-aws-account-id: false
-      - if: env.USE_ROLE != 'true'
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-          mask-aws-account-id: false
-      - name: Upload
-        env:
-          BUCKET: ${{ needs.backend.outputs.site_bucket }}
-          DIST: ${{ needs.backend.outputs.site_distribution_id }}
-        run: |
-          # Hashed assets can be cached for long; the entry files must always be fresh.
-          aws s3 sync build/web "s3://$BUCKET" --delete --exclude '.well-known/*' \
-            --cache-control 'public,max-age=3600'
-          for f in index.html flutter_bootstrap.js flutter_service_worker.js main.dart.js manifest.json version.json; do
-            if [ -f "build/web/$f" ]; then
-              aws s3 cp "build/web/$f" "s3://$BUCKET/$f" --cache-control 'no-cache'
-            fi
-          done
-          aws cloudfront create-invalidation --distribution-id "$DIST" --paths '/*' >/dev/null
-          echo "Published."
