@@ -1,0 +1,31 @@
+{
+  "name": "sidekick-backend",
+  "private": true,
+  "description": "Sidekick's AWS backend: Cognito identity pool, HTTP API, Lambda, DynamoDB and the sidekick on Bedrock (AWS CDK).",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "synth": "cdk synth -c googleClientId=test.apps.googleusercontent.com",
+    "deploy": "cdk deploy",
+    "dev": "tsx src/dev.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-geo-places": "^3.0.0",
+    "@aws-sdk/client-ssm": "^3.1163.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.0.0",
+    "aws-cdk-lib": "^2.200.0",
+    "constructs": "^10.0.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^5.1.0"
+  }
+}
