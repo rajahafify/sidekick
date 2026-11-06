@@ -106,6 +106,8 @@ export class SidekickStack extends Stack {
         resources: [
           'arn:aws:bedrock:*::foundation-model/anthropic.*',
           'arn:aws:bedrock:::foundation-model/anthropic.*',
+          'arn:aws:bedrock:*::foundation-model/amazon.nova*',
+          'arn:aws:bedrock:::foundation-model/amazon.nova*',
           `arn:aws:bedrock:*:${this.account}:inference-profile/*`,
         ],
       }),
