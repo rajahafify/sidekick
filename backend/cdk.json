@@ -1,0 +1,10 @@
+{
+  "app": "npx tsx bin/sidekick.ts",
+  "context": {
+    "region": "ap-southeast-1",
+    "bedrockRegion": "us-east-1",
+    "modelId": "global.anthropic.claude-haiku-5-5",
+    "monthlyBudgetUsd": 25,
+    "placesCountries": "MYS"
+  }
+}
