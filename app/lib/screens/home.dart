@@ -7,6 +7,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/sign_in_sheet.dart';
+import '../widgets/sidekick_status.dart';
 import '../widgets/ui.dart';
 import 'check_in.dart';
 
@@ -300,7 +301,9 @@ class MeTab extends StatelessWidget {
                   reason: 'Keep your profile and check-ins, and connect with people. Guests can’t swipe.'),
               child: const Text('Sign in with Google'),
             ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
+          const SidekickStatusCard(),
+          const SizedBox(height: 20),
           const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,

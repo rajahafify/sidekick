@@ -46,6 +46,7 @@ const OPENERS_PER_USER_PER_EVENT = 40;
 const IMPORTS_PER_USER_PER_DAY = 20;
 const PLACE_LOOKUPS_PER_USER_PER_DAY = 150;
 const EVENTS_PER_USER_PER_DAY = 20;
+const STATUS_CHECKS_PER_USER_PER_DAY = 30;
 
 class HttpError extends Error {
   constructor(
@@ -194,7 +195,28 @@ const matchKey = (a: string, b: string) => (a < b ? `MATCH#${a}#${b}` : `MATCH#$
 // ---------- The app ----------
 
 export class App {
-  constructor(private d: Deps) {}
+  constructor(private d: Deps) {
+    // Remember how the model's last real call went, so the status check can tell whether the
+    // sidekick has been falling back to quick reads.
+    const model = d.model;
+    if (model) {
+      this.d = {
+        ...d,
+        model: async (prompt, opts) => {
+          const r = await model(prompt, opts);
+          await this.store
+            .put({
+              pk: 'STATUS#model',
+              sk: r.text ? 'LAST_OK' : 'LAST_ERROR',
+              at: this.nowIso(),
+              ...(r.text ? {} : { error: (r.error ?? 'No reply').slice(0, 300) }),
+            })
+            .catch(() => {});
+          return r;
+        },
+      };
+    }
+  }
 
   private get store() {
     return this.d.store;
@@ -228,6 +250,7 @@ export class App {
     if (is('POST', 'block')) return this.block(me, body);
     if (is('POST', 'report')) return this.report(me, body);
     if (is('GET', 'status')) return this.status();
+    if (is('POST', 'status', 'check')) return this.checkModel(me);
     if (parts[0] === 'events' && parts.length >= 2) {
       const id = parts[1];
       if (!/^[\w-]{1,160}$/.test(id)) fail(404, 'Event not found.');
@@ -663,9 +686,35 @@ export class App {
   }
 
   private async status() {
+    const [ok, err] = await Promise.all([
+      this.store.get('STATUS#model', 'LAST_OK'),
+      this.store.get('STATUS#model', 'LAST_ERROR'),
+    ]);
     return {
-      model: this.d.model ? `bedrock: ${this.d.modelName ?? 'configured'}` : 'none: the sidekick uses quick reads',
+      model: this.d.model ? (this.d.modelName ?? 'configured') : null,
       places: this.d.places ? 'amazon location' : 'off',
+      lastOk: ok?.at ?? null,
+      lastError: err ? { at: err.at, error: err.error } : null,
+    };
+  }
+
+  /** Sends the model a tiny prompt right now and reports whether it answered, and how fast. */
+  private async checkModel(me: Identity) {
+    if (!this.d.model) return { ok: false, model: null, ms: 0, error: 'No model is set up. The sidekick uses quick reads.' };
+    const today = new Date(this.d.now()).toISOString().slice(0, 10);
+    if (!(await this.takeQuota(`rlc:${today}:${me.id}`, STATUS_CHECKS_PER_USER_PER_DAY, DAY_S)))
+      fail(429, 'That is enough checks for today. Try again tomorrow.');
+    const started = Date.now();
+    const r = await this.d.model(
+      { system: 'You are a health check. Reply with the single word OK.', user: 'Are you there?' },
+      { maxTokens: 16, temperature: 0 },
+    );
+    return {
+      ok: !!r.text,
+      model: this.d.modelName ?? 'configured',
+      ms: Date.now() - started,
+      reply: r.text?.slice(0, 80) ?? null,
+      error: r.text ? null : (r.error ?? 'No reply'),
     };
   }
 }
