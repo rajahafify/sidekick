@@ -142,7 +142,15 @@ export class SidekickStack extends Stack {
         // are involved, so any origin may call it (the site domain, the CloudFront URL, local dev).
         allowOrigins: ['*'],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.DELETE],
-        allowHeaders: ['authorization', 'content-type', 'x-amz-date', 'x-amz-security-token', 'x-amz-content-sha256'],
+        allowHeaders: [
+          'authorization',
+          'content-type',
+          'x-amz-date',
+          'x-amz-security-token',
+          'x-amz-content-sha256',
+          // The Dart SigV4 signer adds and signs this one.
+          'x-amz-user-agent',
+        ],
         maxAge: Duration.days(1),
       },
     });
