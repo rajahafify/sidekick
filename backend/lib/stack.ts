@@ -38,6 +38,8 @@ export type SidekickProps = StackProps & {
   alertEmail?: string;
   /** Monthly AWS budget in USD for the alert. */
   monthlyBudgetUsd: number;
+  /** Parallel-run ceiling for the API Lambda (0 = none). New AWS accounts can't reserve any. */
+  apiConcurrency?: number;
   /** Comma-separated ISO-3166 alpha-3 country codes to prefer in place search, e.g. MYS. */
   placesCountries: string;
   /** The public site (event links, app-link verification), e.g. sidekick.artifisi.com. */
@@ -91,8 +93,9 @@ export class SidekickStack extends Stack {
       architecture: lambda.Architecture.ARM_64,
       memorySize: 512,
       timeout: Duration.seconds(29),
-      // A hard ceiling on parallel runs, so a flood of requests can't run up a bill.
-      reservedConcurrentExecutions: 20,
+      // Optional hard ceiling on parallel runs. New accounts have only 10 in total and can't reserve
+      // any, so it's off by default; the API's own throttle below caps abuse either way.
+      reservedConcurrentExecutions: props.apiConcurrency || undefined,
       logGroup: new logs.LogGroup(this, 'ApiLogs', { retention: logs.RetentionDays.ONE_MONTH }),
       environment: {
         TABLE_NAME: table.tableName,
