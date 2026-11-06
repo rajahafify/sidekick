@@ -129,7 +129,7 @@ export class SidekickStack extends Stack {
     );
     fn.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['geo-places:Autocomplete', 'geo-places:GetPlace', 'geo-places:SearchNearby'],
+        actions: ['geo-places:Suggest', 'geo-places:Autocomplete', 'geo-places:GetPlace', 'geo-places:SearchNearby'],
         resources: [`arn:aws:geo-places:${this.region}::provider/default`],
       }),
     );

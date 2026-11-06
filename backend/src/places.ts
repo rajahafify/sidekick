@@ -1,7 +1,7 @@
 // Place search for the "Where" field and for check-ins, on Amazon Location Service (Places v2).
 // Called with the Lambda's IAM role, so there is no key to leak.
 import {
-  AutocompleteCommand,
+  SuggestCommand,
   GeoPlacesClient,
   GetPlaceCommand,
   SearchNearbyCommand,
@@ -25,7 +25,7 @@ const addressOf = (label: string | undefined, name: string) =>
     .slice(0, 3)
     .join(', ');
 
-// Autocomplete needs a position to rank around. Without the user's own, use the country's main city.
+// Place search needs a position to rank around. Without the user's own, use the country's main city.
 const CAPITALS: Record<string, [number, number]> = {
   MYS: [101.6869, 3.139], // Kuala Lumpur
   SGP: [103.8198, 1.3521],
@@ -40,9 +40,10 @@ export function locationPlaces(region: string, countries: string[]): Places {
   const filter = countries.length ? { IncludeCountries: countries } : undefined;
   const fallbackBias = CAPITALS[countries[0] ?? 'MYS'] ?? CAPITALS.MYS;
   return {
+    // Suggest, not Autocomplete: Autocomplete isn't offered in ap-southeast-1 (GrabMaps data).
     async suggest(input, near) {
       const r = await client.send(
-        new AutocompleteCommand({
+        new SuggestCommand({
           QueryText: input.slice(0, 200),
           MaxResults: 5,
           Filter: filter,
@@ -50,10 +51,10 @@ export function locationPlaces(region: string, countries: string[]): Places {
         }),
       );
       return (r.ResultItems ?? [])
-        .filter((i) => i.PlaceId)
+        .filter((i) => i.SuggestResultItemType === 'Place' && i.Place?.PlaceId)
         .map((i) => {
-          const name = nameOf(i.Title, i.Address?.Label);
-          return { placeId: i.PlaceId!, name, address: addressOf(i.Address?.Label, name) };
+          const name = nameOf(i.Title, i.Place?.Address?.Label);
+          return { placeId: i.Place!.PlaceId!, name, address: addressOf(i.Place?.Address?.Label, name) };
         });
     },
     async details(placeId) {
