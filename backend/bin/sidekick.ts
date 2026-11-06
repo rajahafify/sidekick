@@ -20,5 +20,7 @@ new SidekickStack(app, 'Sidekick', {
   siteDomain: ctx('siteDomain') || undefined,
   siteCertificateArn: ctx('siteCertificateArn') || undefined,
   androidCertSha256: ctx('androidCertSha256') || undefined,
+  githubRepo: ctx('githubRepo', 'rajahafify/sidekick') || undefined,
+  githubOidcProviderArn: ctx('githubOidcProviderArn') || undefined,
   description: 'Sidekick: guest + Google identities, API, data and the sidekick on Bedrock',
 });

@@ -1,7 +1,7 @@
 name: Deploy backend
 
-# Deploys the AWS stack (API, data, identities, site). Run it by hand from the Actions tab.
-# Needs: secret AWS_DEPLOY_ROLE_ARN (an IAM role GitHub can assume via OIDC, see README),
+# Deploys the AWS stack (API, data, identities, website hosting). Run it by hand from the Actions tab.
+# Needs: secret AWS_DEPLOY_ROLE_ARN (the stack's DeployRoleArn output, after the first deploy from CloudShell),
 # and repo variables GOOGLE_WEB_CLIENT_ID and ALERT_EMAIL (optional: SITE_DOMAIN,
 # SITE_CERTIFICATE_ARN, ANDROID_CERT_SHA256).
 on:

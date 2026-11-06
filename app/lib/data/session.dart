@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:aws_common/aws_common.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -87,18 +89,46 @@ class Session extends ChangeNotifier implements Credentials {
   // ---------- Google ----------
 
   static bool _googleReady = false;
+  final _webSignIns = StreamController<Object?>.broadcast();
+
+  /// On the web, Google's own button signs people in, and the result arrives here: null when
+  /// they're signed in and linked, or the error.
+  Stream<Object?> get webSignIns => _webSignIns.stream;
+
+  /// Sets up Google sign-in once. On the web this must run before Google's button is shown.
+  Future<void> prepareGoogle() async {
+    if (_googleReady) return;
+    final google = GoogleSignIn.instance;
+    await google.initialize(
+      serverClientId: Config.googleWebClientId.isEmpty || kIsWeb ? null : Config.googleWebClientId,
+      clientId: kIsWeb ? Config.googleWebClientId : (Config.googleIosClientId.isEmpty ? null : Config.googleIosClientId),
+    );
+    if (kIsWeb) google.authenticationEvents.listen(_onWebEvent, onError: (Object e) => _webSignIns.add(e));
+    _googleReady = true;
+  }
+
+  Future<void> _onWebEvent(GoogleSignInAuthenticationEvent e) async {
+    if (e is! GoogleSignInAuthenticationEventSignIn) return;
+    try {
+      await _identity.refresh(googleIdToken: _tokenOf(e.user));
+      await reloadProfile();
+      _webSignIns.add(null);
+    } catch (err) {
+      _webSignIns.add(err);
+    }
+  }
+
+  String _tokenOf(GoogleSignInAccount account) {
+    googleName = account.displayName ?? '';
+    googlePhoto = account.photoUrl ?? '';
+    final token = account.authentication.idToken;
+    if (token == null) throw IdentityError("Google didn't return a sign-in token. Try again.");
+    return token;
+  }
 
   Future<String> _googleIdToken({required bool interactive}) async {
+    await prepareGoogle();
     final google = GoogleSignIn.instance;
-    if (!_googleReady) {
-      await google.initialize(
-        serverClientId: Config.googleWebClientId.isEmpty || kIsWeb ? null : Config.googleWebClientId,
-        clientId: kIsWeb
-            ? Config.googleWebClientId
-            : (Config.googleIosClientId.isEmpty ? null : Config.googleIosClientId),
-      );
-      _googleReady = true;
-    }
     GoogleSignInAccount? account;
     if (!interactive) {
       account = await google.attemptLightweightAuthentication();
@@ -106,11 +136,7 @@ class Session extends ChangeNotifier implements Credentials {
       account = await google.authenticate();
     }
     if (account == null) throw IdentityError('Sign in again to continue.', code: 'NeedsGoogle');
-    googleName = account.displayName ?? '';
-    googlePhoto = account.photoUrl ?? '';
-    final token = account.authentication.idToken;
-    if (token == null) throw IdentityError("Google didn't return a sign-in token. Try again.");
-    return token;
+    return _tokenOf(account);
   }
 
   Future<void> _refreshGoogle({required bool interactive}) async {

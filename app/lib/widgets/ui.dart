@@ -167,3 +167,19 @@ void haptic() => HapticFeedback.lightImpact();
 
 void toast(BuildContext context, String text) =>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
+/// Google's "G", for our own sign-in button.
+class GoogleMark extends StatelessWidget {
+  const GoogleMark({super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 22,
+    height: 22,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+    child: const Text(
+      'G',
+      style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w700, fontSize: 14),
+    ),
+  );
+}

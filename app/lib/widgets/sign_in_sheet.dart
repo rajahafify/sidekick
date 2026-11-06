@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../data/identity.dart';
-import '../main.dart';
 import '../theme.dart';
+import 'google_button.dart';
 import 'ui.dart';
 
 /// Guests can look, but connecting needs a real account. Returns true once signed in.
@@ -25,12 +25,10 @@ class _SignInSheet extends StatefulWidget {
 }
 
 class _SignInSheetState extends State<_SignInSheet> {
-  bool busy = false;
   String? error;
 
   @override
   Widget build(BuildContext context) {
-    final session = SessionScope.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -47,24 +45,15 @@ class _SignInSheetState extends State<_SignInSheet> {
               style: const TextStyle(color: C.muted, fontSize: 16, height: 1.4),
             ),
             const SizedBox(height: 22),
-            FilledButton(
-              onPressed: busy
-                  ? null
-                  : () async {
-                      setState(() {
-                        busy = true;
-                        error = null;
-                      });
-                      try {
-                        await session.signInWithGoogle();
-                        if (context.mounted) Navigator.pop(context, true);
-                      } catch (e) {
-                        setState(() => error = e is IdentityError ? e.message : '$e');
-                      } finally {
-                        if (mounted) setState(() => busy = false);
-                      }
-                    },
-              child: busy ? const ButtonProgress() : const Text('Continue with Google'),
+            GoogleButton(
+              onResult: (e) {
+                if (!mounted) return;
+                if (e == null) {
+                  Navigator.pop(context, true);
+                } else {
+                  setState(() => error = e is IdentityError ? e.message : '$e');
+                }
+              },
             ),
             const SizedBox(height: 8),
             TextButton(

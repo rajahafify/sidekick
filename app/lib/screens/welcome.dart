@@ -6,6 +6,7 @@ import '../data/identity.dart';
 import '../main.dart';
 import '../theme.dart';
 import '../widgets/dots.dart';
+import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -68,10 +69,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       style: TextStyle(color: C.muted, fontSize: 16, height: 1.45),
                     ),
                     const SizedBox(height: 28),
-                    FilledButton.icon(
-                      onPressed: busy != null ? null : () => _run('google', session.signInWithGoogle),
-                      icon: busy == 'google' ? const ButtonProgress() : const _GoogleMark(),
-                      label: const Text('Continue with Google'),
+                    GoogleButton(
+                      enabled: busy == null,
+                      onResult: (e) {
+                        if (e != null && mounted) setState(() => error = e is IdentityError ? e.message : '$e');
+                      },
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton(
@@ -102,20 +104,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 }
 
-class _GoogleMark extends StatelessWidget {
-  const _GoogleMark();
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 22,
-    height: 22,
-    alignment: Alignment.center,
-    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-    child: const Text(
-      'G',
-      style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w700, fontSize: 14),
-    ),
-  );
-}
 
 class OfflineScreen extends StatelessWidget {
   const OfflineScreen({super.key});

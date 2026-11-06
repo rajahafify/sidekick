@@ -42,6 +42,10 @@ export type SidekickProps = StackProps & {
   siteCertificateArn?: string;
   /** SHA-256 fingerprint of the Android signing key, for /.well-known/assetlinks.json. */
   androidCertSha256?: string;
+  /** GitHub repo (owner/name) allowed to deploy the web app and the stack through OIDC. */
+  githubRepo?: string;
+  /** ARN of an existing GitHub OIDC provider in this account; one is created when left out. */
+  githubOidcProviderArn?: string;
 };
 
 export class SidekickStack extends Stack {
@@ -117,7 +121,9 @@ export class SidekickStack extends Stack {
       apiName: 'sidekick',
       defaultAuthorizer: new HttpIamAuthorizer(),
       corsPreflight: {
-        allowOrigins: ['http://localhost:8080', 'https://sidekick.artifisi.com'],
+        // Every request is SigV4-signed with the caller's own short-lived credentials and no cookies
+        // are involved, so any origin may call it (the site domain, the CloudFront URL, local dev).
+        allowOrigins: ['*'],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.DELETE],
         allowHeaders: ['authorization', 'content-type', 'x-amz-date', 'x-amz-security-token', 'x-amz-content-sha256'],
         maxAge: Duration.days(1),
@@ -181,17 +187,21 @@ export class SidekickStack extends Stack {
       });
     }
 
-    // ---------- Public site: landing page, event links, Android app-link verification ----------
+    // ---------- Website: the Flutter app itself, plus Android app-link verification ----------
+    // The web build is uploaded by the "Deploy web" GitHub workflow (it needs Flutter to build);
+    // this stack only creates the bucket and CDN, and writes /.well-known/assetlinks.json.
     const bucket = new s3.Bucket(this, 'Site', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
     });
-    // /e/<id> is the same page for every event; the app reads the id from the link.
-    const rewrite = new cloudfront.Function(this, 'EventLinks', {
+    // A single-page app: any path that isn't a file (/e/<id>, /me, ...) gets index.html and the
+    // app's router takes it from there.
+    const spa = new cloudfront.Function(this, 'AppRoutes', {
       code: cloudfront.FunctionCode.fromInline(
-        "function handler(e){var r=e.request;if(r.uri.indexOf('/e/')===0){r.uri='/e/index.html';}else if(r.uri.endsWith('/')){r.uri+='index.html';}return r;}",
+        "function handler(e){var r=e.request;var u=r.uri;if(u.indexOf('/.well-known/')===0)return r;" +
+          "var last=u.substring(u.lastIndexOf('/')+1);if(last.indexOf('.')===-1){r.uri='/index.html';}return r;}",
       ),
       runtime: cloudfront.FunctionRuntime.JS_2_0,
     });
@@ -199,7 +209,7 @@ export class SidekickStack extends Stack {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        functionAssociations: [{ function: rewrite, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+        functionAssociations: [{ function: spa, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
       },
       defaultRootObject: 'index.html',
       priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
@@ -222,19 +232,55 @@ export class SidekickStack extends Stack {
           },
         ]
       : [];
-    new s3deploy.BucketDeployment(this, 'SiteFiles', {
+    new s3deploy.BucketDeployment(this, 'AppLinks', {
       destinationBucket: bucket,
       distribution: cdn,
-      sources: [
-        s3deploy.Source.asset(path.join(__dirname, '../../site')),
-        s3deploy.Source.jsonData('.well-known/assetlinks.json', assetLinks),
-      ],
+      distributionPaths: ['/.well-known/*'],
+      prune: false, // leave the web app's files alone
+      sources: [s3deploy.Source.jsonData('.well-known/assetlinks.json', assetLinks)],
     });
+
+    // ---------- GitHub deploys (OIDC, no stored AWS keys) ----------
+    if (props.githubRepo) {
+      const provider = props.githubOidcProviderArn
+        ? iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(this, 'GitHubOidc', props.githubOidcProviderArn)
+        : new iam.OpenIdConnectProvider(this, 'GitHubOidc', {
+            url: 'https://token.actions.githubusercontent.com',
+            clientIds: ['sts.amazonaws.com'],
+          });
+      const deployRole = new iam.Role(this, 'GitHubDeploy', {
+        description: `Lets GitHub Actions in ${props.githubRepo} deploy Sidekick`,
+        maxSessionDuration: Duration.hours(1),
+        assumedBy: new iam.WebIdentityPrincipal(provider.openIdConnectProviderArn, {
+          StringEquals: { 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com' },
+          StringLike: { 'token.actions.githubusercontent.com:sub': `repo:${props.githubRepo}:*` },
+        }),
+      });
+      // The web app: upload files and refresh the CDN.
+      bucket.grantReadWrite(deployRole);
+      bucket.grantDelete(deployRole);
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['cloudfront:CreateInvalidation'],
+          resources: [`arn:aws:cloudfront::${this.account}:distribution/${cdn.distributionId}`],
+        }),
+      );
+      // The stack: `cdk deploy` works through the roles `cdk bootstrap` made.
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['sts:AssumeRole'],
+          resources: [`arn:aws:iam::${this.account}:role/cdk-*`],
+        }),
+      );
+      new CfnOutput(this, 'DeployRoleArn', { value: deployRole.roleArn });
+    }
 
     // ---------- What the app needs ----------
     new CfnOutput(this, 'ApiUrl', { value: api.apiEndpoint });
     new CfnOutput(this, 'IdentityPoolId', { value: pool.ref });
     new CfnOutput(this, 'Region', { value: this.region });
     new CfnOutput(this, 'SiteUrl', { value: `https://${cdn.distributionDomainName}` });
+    new CfnOutput(this, 'SiteBucket', { value: bucket.bucketName });
+    new CfnOutput(this, 'SiteDistributionId', { value: cdn.distributionId });
   }
 }

@@ -50,6 +50,8 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Web build compiles
+        run: flutter build web --release --no-web-resources-cdn
       - name: App settings from the repo variables
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
