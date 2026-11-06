@@ -1,0 +1,5 @@
+node_modules/
+backend/cdk.out/
+.DS_Store
+*.jks
+*.keystore
