@@ -14,7 +14,7 @@ Everything runs on AWS, in one CDK stack.
 | Identity | Cognito identity pool | A guest gets an unauthenticated identity. Google sign-in is linked to that same identity, so a guest keeps their data. Both get short-lived AWS credentials that can only call the API. |
 | API | API Gateway (HTTP API, IAM auth) → Lambda (`backend/src`) | One Node 22 Lambda. API Gateway checks each request's signature and tells the Lambda who is calling and whether they're a guest. |
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
-| Sidekick | Amazon Bedrock, Claude Haiku 5.5 | Called with the Lambda's IAM role, so there's no API key to leak. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
+| Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
 | Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
 | Website | S3 + CloudFront | The Flutter web build, published by the **Deploy web** workflow. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
 | Cost guard | AWS Budgets, Lambda concurrency cap, API throttling | Email alert at 50% of the monthly budget and when the forecast passes 100%. |
@@ -53,8 +53,16 @@ Do these once. Nothing here needs a Google Cloud billing account.
 3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (and the `SiteUrl` from step 3 once you have it, plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
 4. Create another client → **Android**: package `com.artifisi.sidekick`, and the **SHA-1** of your release key (step 5). Add a second Android client with the debug key's SHA-1 if you want sign-in in debug builds (`cd app/android && ./gradlew signingReport`).
 
-### 2. Bedrock model access (AWS console)
-Models are on by default, but Anthropic asks for a one-time use-case form. In the Bedrock console in **us-east-1** → Model catalog → **Claude Haiku 5.5** → Open in playground, fill in the form that pops up, and send a test message. Until then the sidekick uses its template, so nothing breaks.
+### 2. The sidekick's model
+**Now: OpenRouter (free).** Make a key at https://openrouter.ai/settings/keys, then store it in CloudShell (ap-southeast-1) before deploying:
+
+```sh
+aws ssm put-parameter --name /sidekick/openrouter-api-key --type SecureString --value '<your key>'
+```
+
+To change it later, add `--overwrite`. Without the key the sidekick uses its template, so nothing breaks. Free models are rate limited and may log prompts, so this is for the pilot only.
+
+**Later: Bedrock.** Once AWS enables Bedrock on the account, open **Claude Haiku 5.5** in the Bedrock playground (us-east-1), fill in Anthropic's one-time form, then redeploy with `-c llmProvider=bedrock`.
 
 ### 3. Deploy the backend (once, from CloudShell)
 Open **AWS CloudShell** (the `>_` icon in the AWS console), signed in as an admin of your account, in region **Asia Pacific (Singapore) ap-southeast-1**:
@@ -66,7 +74,7 @@ npx cdk bootstrap
 npx cdk deploy -c googleClientId=<GOOGLE_WEB_CLIENT_ID> -c alertEmail=<your email>
 ```
 
-It prints `ApiUrl`, `IdentityPoolId`, `Region`, `SiteUrl`, `SiteBucket`, `SiteDistributionId` and `DeployRoleArn`. Confirm the AWS Budgets email it sends. Other settings (`cdk.json` or `-c`): `monthlyBudgetUsd` (default 25), `modelId` (default `global.anthropic.claude-haiku-5-5`), `bedrockRegion` (us-east-1), `placesCountries` (MYS), `githubRepo` (rajahafify/sidekick), and `githubOidcProviderArn` if your account already has a GitHub OIDC provider.
+It prints `ApiUrl`, `IdentityPoolId`, `Region`, `SiteUrl`, `SiteBucket`, `SiteDistributionId` and `DeployRoleArn`. Confirm the AWS Budgets email it sends. Other settings (`cdk.json` or `-c`): `monthlyBudgetUsd` (default 25), `llmProvider` (`openrouter`, or `bedrock`), `modelId` (default `openrouter/free`, or `global.anthropic.claude-haiku-5-5` on Bedrock), `bedrockRegion` (us-east-1), `placesCountries` (MYS), `githubRepo` (rajahafify/sidekick), and `githubOidcProviderArn` if your account already has a GitHub OIDC provider.
 
 After this, GitHub can deploy for you: `DeployRoleArn` is a role only this repo's workflows can use, with no stored AWS keys.
 

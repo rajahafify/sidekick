@@ -12,7 +12,10 @@ if (!googleClientId) throw new Error('Set googleClientId: npx cdk deploy -c goog
 new SidekickStack(app, 'Sidekick', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: ctx('region', process.env.CDK_DEFAULT_REGION || 'ap-southeast-1') },
   googleClientId,
-  modelId: ctx('modelId', 'global.anthropic.claude-haiku-5-5'),
+  // OpenRouter's free router for now; switch to Bedrock with -c llmProvider=bedrock -c modelId=global.anthropic.claude-haiku-5-5
+  llmProvider: ctx('llmProvider', 'openrouter') === 'bedrock' ? 'bedrock' : 'openrouter',
+  modelId: ctx('modelId', ctx('llmProvider', 'openrouter') === 'bedrock' ? 'global.anthropic.claude-haiku-5-5' : 'openrouter/free'),
+  openRouterKeyParam: ctx('openRouterKeyParam', '/sidekick/openrouter-api-key'),
   bedrockRegion: ctx('bedrockRegion', 'us-east-1'),
   alertEmail: ctx('alertEmail') || undefined,
   monthlyBudgetUsd: Number(ctx('monthlyBudgetUsd', '25')),

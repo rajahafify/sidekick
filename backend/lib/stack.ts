@@ -26,8 +26,12 @@ import type { Construct } from 'constructs';
 export type SidekickProps = StackProps & {
   /** OAuth "Web application" client id from Google Cloud. Google ID tokens must be issued for it. */
   googleClientId: string;
-  /** Bedrock model or inference profile id for the sidekick. */
+  /** Where the sidekick's model runs: 'openrouter' (key in SSM) or 'bedrock' (IAM role). */
+  llmProvider: 'openrouter' | 'bedrock';
+  /** OpenRouter model id, or Bedrock model / inference profile id. */
   modelId: string;
+  /** SSM SecureString holding the OpenRouter API key. */
+  openRouterKeyParam: string;
   /** Region to call Bedrock in (the model must be enabled there). */
   bedrockRegion: string;
   /** Where the monthly budget alert goes. */
@@ -93,7 +97,9 @@ export class SidekickStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         IDENTITY_POOL_ID: pool.ref,
+        LLM_PROVIDER: props.llmProvider,
         MODEL_ID: props.modelId,
+        OPENROUTER_KEY_PARAM: props.openRouterKeyParam,
         BEDROCK_REGION: props.bedrockRegion,
         PLACES_COUNTRIES: props.placesCountries,
       },
@@ -110,6 +116,12 @@ export class SidekickStack extends Stack {
           'arn:aws:bedrock:::foundation-model/amazon.nova*',
           `arn:aws:bedrock:*:${this.account}:inference-profile/*`,
         ],
+      }),
+    );
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${props.openRouterKeyParam}`],
       }),
     );
     fn.addToRolePolicy(
