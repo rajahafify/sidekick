@@ -666,7 +666,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                               children: [
                                 Row(
                                   children: [
-                                    const QuestMark(size: 14, color: C.go),
+                                    const SidekickMark(size: 10, color: C.go, sparkColor: null),
                                     const SizedBox(width: 8),
                                     Text(
                                       'SIDEKICK PICK · ${_fit.toUpperCase()}',
@@ -754,7 +754,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
               label: 'Connect',
               onTap: () => _go(true),
               color: C.go,
-              child: const QuestMark(size: 30, color: C.onInk),
+              child: const SidekickMark(size: 22, color: C.onInk, sparkColor: null),
             ),
           ],
         ),

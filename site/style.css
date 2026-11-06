@@ -14,3 +14,4 @@ main::before { content:""; display:block; height:220px; margin-bottom:28px; bord
   background:radial-gradient(circle, #fff 1.7px, transparent 2.1px) 0 0/10px 10px, radial-gradient(circle, #fff 1.7px, transparent 2.1px) 5px 5px/10px 10px;
   -webkit-mask-image:radial-gradient(ellipse 70% 90% at 50% 0%, #000 10%, rgba(0,0,0,.25) 55%, transparent 85%);
           mask-image:radial-gradient(ellipse 70% 90% at 50% 0%, #000 10%, rgba(0,0,0,.25) 55%, transparent 85%); }
+.mark { display:block; width:76px; height:auto; margin-bottom:22px; }

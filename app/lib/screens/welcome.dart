@@ -48,7 +48,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   children: [
                     const Row(
                       children: [
-                        QuestMark(size: 18),
+                        SidekickMark(size: 14),
                         SizedBox(width: 10),
                         Text('SIDEKICK', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 2)),
                       ],

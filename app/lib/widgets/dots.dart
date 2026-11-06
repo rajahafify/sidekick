@@ -102,56 +102,85 @@ DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
   };
 }
 
-/// The quest marker: a four-point sparkle over a dot.
-Path questMarkPath(Rect box) {
-  // Designed in a 120 x 160 box (from the 200 x 200 artboard, offset by 40, 20).
-  final sx = box.width / 120, sy = box.height / 160;
-  Offset o(double x, double y) => Offset(box.left + (x - 40) * sx, box.top + (y - 20) * sy);
-  final a = o(100, 30), b = o(104, 58), c = o(112, 66), d = o(140, 70);
-  final p = Path()..moveTo(a.dx, a.dy);
-  void cubic(Offset c1, Offset c2, Offset e) => p.cubicTo(c1.dx, c1.dy, c2.dx, c2.dy, e.dx, e.dy);
-  cubic(b, c, d);
-  cubic(o(112, 74), o(104, 82), o(100, 110));
-  cubic(o(96, 82), o(88, 74), o(60, 70));
-  cubic(o(88, 66), o(96, 58), a);
-  p.close();
-  final dot = o(100, 148);
-  p.addOval(Rect.fromCircle(center: dot, radius: 22 * sx));
+/// The Sidekick mark: a domino mask with a wink. The left eye is open; the right eye is a
+/// sparkle (your sidekick spotted someone). Drawn on a 200 x 200 artboard; the mask spans
+/// x 14..186 and y 56..136.
+const _maskOutline =
+    'M14 96 C24 64 66 56 100 70 C134 56 176 64 186 96 C178 128 146 138 120 122 C111 116 105 115 100 120 '
+    'C95 115 89 116 80 122 C54 138 22 128 14 96Z';
+const _leftEye = 'M40 98 C46 84 70 80 84 92 C78 106 52 110 40 98Z';
+const _rightEye = 'M160 98 C154 84 130 80 116 92 C122 106 148 110 160 98Z';
+const _spark = 'M138 76 C140 88 143 91 155 93 C143 95 140 98 138 110 C136 98 133 95 121 93 C133 91 136 88 138 76Z';
+const _art = Rect.fromLTRB(14, 56, 186, 136);
+
+/// Width / height of the mark.
+const markAspect = 172 / 80;
+
+/// Parses the absolute M / C / Z path data used above.
+Path _svg(String d, Rect box) {
+  final sx = box.width / _art.width, sy = box.height / _art.height;
+  final t = RegExp(r'[MCZ]|-?\d+(\.\d+)?').allMatches(d).map((m) => m.group(0)!).toList();
+  final p = Path();
+  var i = 0;
+  double n() => double.parse(t[i++]);
+  Offset pt() {
+    final x = n(), y = n();
+    return Offset(box.left + (x - _art.left) * sx, box.top + (y - _art.top) * sy);
+  }
+
+  String cmd = 'M';
+  while (i < t.length) {
+    if (RegExp(r'^[MCZ]$').hasMatch(t[i])) cmd = t[i++];
+    if (cmd == 'Z') {
+      p.close();
+      continue;
+    }
+    if (cmd == 'M') {
+      final a = pt();
+      p.moveTo(a.dx, a.dy);
+      cmd = 'C';
+    } else {
+      final a = pt(), b = pt(), c = pt();
+      p.cubicTo(a.dx, a.dy, b.dx, b.dy, c.dx, c.dy);
+    }
+  }
   return p;
 }
 
-/// The solid mark, for buttons and small places.
-class QuestMark extends StatelessWidget {
-  const QuestMark({super.key, this.size = 20, this.color = C.ink});
+/// The mask with its eye holes. With [wink], the right eye is left closed for the sparkle.
+Path maskPath(Rect box, {bool wink = true}) {
+  final p = _svg(_maskOutline, box)..addPath(_svg(_leftEye, box), Offset.zero);
+  if (!wink) p.addPath(_svg(_rightEye, box), Offset.zero);
+  return p..fillType = PathFillType.evenOdd;
+}
+
+Path sparkPath(Rect box) => _svg(_spark, box);
+
+/// The mark. [size] is its height. The sparkle takes [sparkColor]; without one, both eyes are open.
+class SidekickMark extends StatelessWidget {
+  const SidekickMark({super.key, this.size = 20, this.color = C.ink, this.sparkColor = C.go});
   final double size;
   final Color color;
+  final Color? sparkColor;
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: size * 0.75,
+    width: size * markAspect,
     height: size,
-    child: CustomPaint(painter: _MarkPainter(color)),
+    child: CustomPaint(painter: _MarkPainter(color, sparkColor)),
   );
 }
 
 class _MarkPainter extends CustomPainter {
-  _MarkPainter(this.color);
+  _MarkPainter(this.color, this.spark);
   final Color color;
+  final Color? spark;
   @override
-  void paint(Canvas canvas, Size s) => canvas.drawPath(questMarkPath(Offset.zero & s), Paint()..color = color);
-  @override
-  bool shouldRepaint(_MarkPainter old) => old.color != color;
-}
+  void paint(Canvas canvas, Size s) {
+    final box = Offset.zero & s;
+    canvas.drawPath(maskPath(box, wink: spark != null), Paint()..color = color);
+    if (spark != null) canvas.drawPath(sparkPath(box), Paint()..color = spark!);
+  }
 
-/// The mark drawn in dots, for the welcome screen and the splash.
-DotField markField({double markHeight = 0.62}) {
-  Size? last;
-  late Path path;
-  return (p, s) {
-    if (s != last) {
-      last = s;
-      final h = s.height * markHeight;
-      path = questMarkPath(Rect.fromCenter(center: s.center(Offset.zero), width: h * 0.75, height: h));
-    }
-    return path.contains(p) ? 1.0 : 0.0;
-  };
+  @override
+  bool shouldRepaint(_MarkPainter old) => old.color != color || old.spark != spark;
 }
