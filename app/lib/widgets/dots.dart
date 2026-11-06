@@ -105,23 +105,27 @@ DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
 enum BuddyMood { normal, wink, happy }
 
 /// Width / height of Buddy.
-const markAspect = 152 / 120;
+const markAspect = 140 / 120;
 
-/// Buddy, the Sidekick mascot: a round robot head with a visor and smiling orange eyes.
-/// [size] is its height. It winks when it has spotted someone and beams on a match.
+/// Buddy, the Sidekick mascot: a soft round face with shiny eyes and orange cheeks.
+/// [size] is its height. It winks when it has spotted someone and grins on a match.
 class SidekickMark extends StatelessWidget {
   const SidekickMark({
     super.key,
     this.size = 20,
     this.color = C.ink,
-    this.visor = C.paper,
-    this.eyes = C.go,
+    this.features = C.paper,
+    this.cheeks = C.go,
     this.mood = BuddyMood.normal,
   });
   final double size;
+
+  /// The face.
   final Color color;
-  final Color visor;
-  final Color eyes;
+
+  /// Eyes and mouth.
+  final Color features;
+  final Color cheeks;
   final BuddyMood mood;
 
   @override
@@ -129,63 +133,70 @@ class SidekickMark extends StatelessWidget {
     width: size * markAspect,
     height: size,
     child: CustomPaint(
-      painter: BuddyPainter(color: color, visor: visor, eyes: eyes, mood: mood),
+      painter: BuddyPainter(color: color, features: features, cheeks: cheeks, mood: mood),
     ),
   );
 }
 
 class BuddyPainter extends CustomPainter {
-  BuddyPainter({required this.color, required this.visor, required this.eyes, required this.mood});
-  final Color color, visor, eyes;
+  BuddyPainter({required this.color, required this.features, required this.cheeks, required this.mood});
+  final Color color, features, cheeks;
   final BuddyMood mood;
 
-  // Drawn on a 200 x 200 artboard; Buddy spans x 24..176, y 52..172.
-  static const art = Rect.fromLTRB(24, 52, 176, 172);
+  // Drawn on a 200 x 200 artboard; Buddy spans x 30..170, y 52..172.
+  static const art = Rect.fromLTRB(30, 52, 170, 172);
 
   @override
   void paint(Canvas canvas, Size s) {
     canvas.save();
     canvas.scale(s.width / art.width, s.height / art.height);
     canvas.translate(-art.left, -art.top);
-    final body = Paint()..color = color;
-    // Ears, head, visor.
-    canvas.drawCircle(const Offset(36, 113), 12, body);
-    canvas.drawCircle(const Offset(164, 113), 12, body);
-    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(30, 52, 140, 120), const Radius.circular(56)), body);
     canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(50, 76, 100, 70), const Radius.circular(35)),
-      Paint()..color = visor,
+      RRect.fromRectAndRadius(const Rect.fromLTWH(30, 52, 140, 120), const Radius.circular(58)),
+      Paint()..color = color,
     );
-    // Smiling eyes and mouth.
-    Paint stroke(double w) => Paint()
-      ..color = eyes
+    final ink = Paint()..color = features;
+    final line = Paint()
+      ..color = features
       ..style = PaintingStyle.stroke
-      ..strokeWidth = w
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
-    Path arc(double x) => Path()
-      ..moveTo(x - 12, 110)
-      ..quadraticBezierTo(x, 94, x + 12, 110);
-    if (mood == BuddyMood.wink) {
-      canvas.drawCircle(const Offset(80, 104), 9, Paint()..color = eyes);
-    } else {
-      canvas.drawPath(arc(80), stroke(8));
+    // Cheeks.
+    final blush = Paint()..color = cheeks.withValues(alpha: 0.9);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(62, 126), width: 20, height: 12), blush);
+    canvas.drawOval(Rect.fromCenter(center: const Offset(138, 126), width: 20, height: 12), blush);
+    // Eyes, with a shine. The right one closes for a wink.
+    void eye(double x) {
+      canvas.drawOval(Rect.fromCenter(center: Offset(x, 104), width: 22, height: 28), ink);
+      canvas.drawCircle(Offset(x + 4, 98), 4, Paint()..color = color);
     }
-    canvas.drawPath(arc(120), stroke(8));
-    if (mood == BuddyMood.happy) {
-      // A wide open grin.
+
+    eye(78);
+    if (mood == BuddyMood.wink) {
       canvas.drawPath(
         Path()
-          ..moveTo(86, 124)
-          ..quadraticBezierTo(100, 144, 114, 124)
+          ..moveTo(110, 106)
+          ..quadraticBezierTo(122, 94, 134, 106),
+        line,
+      );
+    } else {
+      eye(122);
+    }
+    // Mouth: a smile, or a grin on a match.
+    if (mood == BuddyMood.happy) {
+      canvas.drawPath(
+        Path()
+          ..moveTo(86, 128)
+          ..quadraticBezierTo(100, 150, 114, 128)
           ..close(),
-        Paint()..color = eyes,
+        ink,
       );
     } else {
       canvas.drawPath(
         Path()
-          ..moveTo(88, 126)
-          ..quadraticBezierTo(100, 136, 112, 126),
-        stroke(6),
+          ..moveTo(88, 130)
+          ..quadraticBezierTo(100, 142, 112, 130),
+        line,
       );
     }
     canvas.restore();
@@ -193,5 +204,5 @@ class BuddyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BuddyPainter old) =>
-      old.color != color || old.visor != visor || old.eyes != eyes || old.mood != mood;
+      old.color != color || old.features != features || old.cheeks != cheeks || old.mood != mood;
 }

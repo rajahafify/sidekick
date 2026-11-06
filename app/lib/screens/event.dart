@@ -754,7 +754,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
               label: 'Connect',
               onTap: () => _go(true),
               color: C.go,
-              child: const SidekickMark(size: 30, color: C.onInk, visor: C.go, eyes: C.onInk),
+              child: const SidekickMark(size: 30, color: C.onInk, features: C.go, cheeks: C.ink),
             ),
           ],
         ),
