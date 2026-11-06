@@ -105,10 +105,10 @@ DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
 enum BuddyMood { normal, wink, happy }
 
 /// Width / height of Buddy.
-const markAspect = 152 / 133;
+const markAspect = 152 / 120;
 
-/// Buddy, the Sidekick mascot: a round robot head with a visor, orange eyes and an antenna.
-/// [size] is its height. It winks when it has spotted someone and smiles on a match.
+/// Buddy, the Sidekick mascot: a round robot head with a visor and smiling orange eyes.
+/// [size] is its height. It winks when it has spotted someone and beams on a match.
 class SidekickMark extends StatelessWidget {
   const SidekickMark({
     super.key,
@@ -139,8 +139,8 @@ class BuddyPainter extends CustomPainter {
   final Color color, visor, eyes;
   final BuddyMood mood;
 
-  // Drawn on a 200 x 200 artboard; Buddy spans x 24..176, y 27..160.
-  static const art = Rect.fromLTRB(24, 27, 176, 160);
+  // Drawn on a 200 x 200 artboard; Buddy spans x 24..176, y 52..172.
+  static const art = Rect.fromLTRB(24, 52, 176, 172);
 
   @override
   void paint(Canvas canvas, Size s) {
@@ -148,42 +148,45 @@ class BuddyPainter extends CustomPainter {
     canvas.scale(s.width / art.width, s.height / art.height);
     canvas.translate(-art.left, -art.top);
     final body = Paint()..color = color;
-    RRect r(double x, double y, double w, double h, double rad) =>
-        RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), Radius.circular(rad));
-    // Antenna.
-    canvas.drawLine(
-      const Offset(100, 44),
-      const Offset(100, 62),
-      Paint()
-        ..color = color
-        ..strokeWidth = 8
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawCircle(const Offset(100, 38), 11, Paint()..color = eyes);
     // Ears, head, visor.
-    canvas.drawRRect(r(24, 96, 14, 30, 7), body);
-    canvas.drawRRect(r(162, 96, 14, 30, 7), body);
-    canvas.drawRRect(r(38, 60, 124, 100, 40), body);
-    canvas.drawRRect(r(54, 80, 92, 52, 24), Paint()..color = visor);
-    // Eyes.
-    final eye = Paint()..color = eyes;
-    final arc = Paint()
+    canvas.drawCircle(const Offset(36, 113), 12, body);
+    canvas.drawCircle(const Offset(164, 113), 12, body);
+    canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(30, 52, 140, 120), const Radius.circular(56)), body);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(50, 76, 100, 70), const Radius.circular(35)),
+      Paint()..color = visor,
+    );
+    // Smiling eyes and mouth.
+    Paint stroke(double w) => Paint()
       ..color = eyes
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
+      ..strokeWidth = w
       ..strokeCap = StrokeCap.round;
-    Path smile(double x) => Path()
-      ..moveTo(x - 9, 110)
-      ..quadraticBezierTo(x, 98, x + 9, 110);
-    if (mood == BuddyMood.happy) {
-      canvas.drawPath(smile(79), arc);
+    Path arc(double x) => Path()
+      ..moveTo(x - 12, 110)
+      ..quadraticBezierTo(x, 94, x + 12, 110);
+    if (mood == BuddyMood.wink) {
+      canvas.drawCircle(const Offset(80, 104), 9, Paint()..color = eyes);
     } else {
-      canvas.drawRRect(r(72, 94, 14, 24, 7), eye);
+      canvas.drawPath(arc(80), stroke(8));
     }
-    if (mood == BuddyMood.normal) {
-      canvas.drawRRect(r(114, 94, 14, 24, 7), eye);
+    canvas.drawPath(arc(120), stroke(8));
+    if (mood == BuddyMood.happy) {
+      // A wide open grin.
+      canvas.drawPath(
+        Path()
+          ..moveTo(86, 124)
+          ..quadraticBezierTo(100, 144, 114, 124)
+          ..close(),
+        Paint()..color = eyes,
+      );
     } else {
-      canvas.drawPath(smile(121), arc);
+      canvas.drawPath(
+        Path()
+          ..moveTo(88, 126)
+          ..quadraticBezierTo(100, 136, 112, 126),
+        stroke(6),
+      );
     }
     canvas.restore();
   }
