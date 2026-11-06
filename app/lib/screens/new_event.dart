@@ -6,6 +6,7 @@ import '../logic/geo_when.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/dots.dart';
 import '../widgets/place_field.dart';
 import '../widgets/ui.dart';
 
@@ -112,41 +113,54 @@ class _NewEventScreenState extends State<NewEventScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
           children: [
-            const Text('ADD AN EVENT', style: eyebrow),
-            const SizedBox(height: 10),
-            Text('Where are you going?', style: displayStyle(40)),
-            const SizedBox(height: 22),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                child: TextField(
-                  controller: link,
-                  keyboardType: TextInputType.url,
-                  decoration: const InputDecoration(labelText: 'Event link', hintText: 'meetup.com/…'),
-                  onSubmitted: (_) => _import(),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                height: 56,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(80, 56)),
-                  onPressed: importing ? null : _import,
-                  child: importing
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
-                      : const Text('Fill in'),
-                ),
-              ),
-            ]),
-            if (importError != null) ErrorNote(importError),
+            Text('Add an event', style: displayStyle(40)),
             const SizedBox(height: 8),
-            const Text('Your sidekick reads the page and fills in the rest. Or type it below.',
-                style: TextStyle(color: C.muted, fontSize: 13)),
+            const Text('Add it once, and everyone who opens the link or scans the QR code joins the same room.',
+                style: TextStyle(color: C.muted, fontSize: 16, height: 1.45)),
             const SizedBox(height: 22),
+            SurfaceCard(
+              padding: const EdgeInsets.all(18),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  const SidekickMark(size: 14, mood: BuddyMood.wink),
+                  const SizedBox(width: 8),
+                  Text('HAVE A LINK?', style: eyebrow.copyWith(fontSize: 11)),
+                ]),
+                const SizedBox(height: 8),
+                const Text('Let your sidekick fill this in', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 14),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    child: TextField(
+                      controller: link,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(hintText: 'Paste the event link'),
+                      onSubmitted: (_) => _import(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    height: 56,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size(88, 56)),
+                      onPressed: importing ? null : _import,
+                      child: importing ? const ButtonProgress() : const Text('Import'),
+                    ),
+                  ),
+                ]),
+                if (importError != null) ErrorNote(importError),
+                const SizedBox(height: 10),
+                const Text('Works with Luma, Meetup, Eventbrite and most event pages.',
+                    style: TextStyle(color: C.muted, fontSize: 13)),
+              ]),
+            ),
+            const SizedBox(height: 26),
+            const SectionLabel('Or fill it in'),
             TextField(
               controller: name,
               maxLength: 100,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Name', counterText: ''),
+              decoration: const InputDecoration(labelText: 'Event name', counterText: ''),
             ),
             const SizedBox(height: 12),
             PlaceField(controller: place, onPicked: (p) => setState(() => picked = p)),

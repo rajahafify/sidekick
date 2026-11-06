@@ -114,8 +114,11 @@ class _CheckInViewState extends State<CheckInView> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
           children: [
-            if (widget.showHeader) ...[const Text('CHECK IN', style: eyebrow), const SizedBox(height: 18)],
-            Text('Where are you?', style: displayStyle(44)),
+            if (widget.showHeader) ...[
+              const Align(alignment: Alignment.centerLeft, child: Wordmark()),
+              const SizedBox(height: 30),
+            ],
+            Text('Check in to a place', style: displayStyle(40)),
             const SizedBox(height: 10),
             const Text(
               'At a coworking space, a café or a venue with no event page? Check in, and your sidekick scouts '
@@ -159,7 +162,7 @@ class _CheckInViewState extends State<CheckInView> {
             const SizedBox(height: 18),
             PlaceField(
               controller: place,
-              label: 'Place',
+              label: 'Where are you?',
               hint: 'Common Ground, Bukit Bintang',
               onPicked: (p) => setState(() => picked = p),
             ),
@@ -176,6 +179,16 @@ class _CheckInViewState extends State<CheckInView> {
             const Text(
               'When we know where the place is, you need to be there to check in. Your location is only used for that check.',
               style: TextStyle(color: C.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 22),
+            Center(
+              child: TextButton(
+                onPressed: () => context.push('/new'),
+                child: Text.rich(TextSpan(children: [
+                  const TextSpan(text: 'Going to an event instead? ', style: TextStyle(color: C.muted)),
+                  TextSpan(text: 'Add the event', style: const TextStyle(color: C.go, fontWeight: FontWeight.w500)),
+                ])),
+              ),
             ),
           ],
         ),

@@ -66,16 +66,16 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     decoration: BoxDecoration(
-      color: highlight ? C.go : C.soft,
+      color: highlight ? C.goSoft : C.soft,
       borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: highlight ? C.go : C.line),
+      border: Border.all(color: highlight ? C.go.withValues(alpha: 0.6) : C.line),
     ),
     child: Text(
       label,
       style: TextStyle(
         fontSize: 13,
-        color: highlight ? C.onInk : C.ink,
-        fontWeight: highlight ? FontWeight.w600 : null,
+        color: highlight ? C.go : C.ink,
+        fontWeight: highlight ? FontWeight.w500 : null,
       ),
     ),
   );
@@ -182,4 +182,34 @@ class GoogleMark extends StatelessWidget {
       style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w700, fontSize: 14),
     ),
   );
+}
+
+/// The old app's header: the Buddy mark and "Sidekick." in the serif italic.
+class Wordmark extends StatelessWidget {
+  const Wordmark({super.key, this.size = 26});
+  final double size;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        SidekickMark(size: size * 0.8),
+        SizedBox(width: size * 0.35),
+        Text('Sidekick.', style: displayStyle(size, style: FontStyle.italic)),
+      ]);
+}
+
+/// A letterspaced caps label over a section, like YOUR EVENTS.
+class SectionLabel extends StatelessWidget {
+  const SectionLabel(this.text, {super.key, this.trailing});
+  final String text;
+  final Widget? trailing;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(children: [
+          Expanded(
+            child: Text(text.toUpperCase(),
+                style: const TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
+          ),
+          ?trailing,
+        ]),
+      );
 }
