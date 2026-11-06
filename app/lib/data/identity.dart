@@ -20,6 +20,7 @@ class IdentityError implements Exception {
 class Identity {
   static const _kId = 'identityId';
   static const _kGoogle = 'signedInWithGoogle';
+  static const _kCreds = 'awsCredentials';
 
   String? id;
   bool google = false;
@@ -31,6 +32,19 @@ class Identity {
     final p = await SharedPreferences.getInstance();
     id = p.getString(_kId);
     google = p.getBool(_kGoogle) ?? false;
+    // Keep the short-lived credentials across reloads, so a page refresh doesn't need Google again.
+    final saved = p.getString(_kCreds);
+    if (id != null && saved != null) {
+      try {
+        final c = jsonDecode(saved) as Map<String, dynamic>;
+        _creds = AWSCredentials(
+          c['k'] as String,
+          c['s'] as String,
+          c['t'] as String,
+          DateTime.fromMillisecondsSinceEpoch(c['e'] as int, isUtc: true),
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _save() async {
@@ -38,9 +52,22 @@ class Identity {
     if (id == null) {
       await p.remove(_kId);
       await p.remove(_kGoogle);
+      await p.remove(_kCreds);
     } else {
       await p.setString(_kId, id!);
       await p.setBool(_kGoogle, google);
+      final c = _creds;
+      if (c != null && c.expiration != null) {
+        await p.setString(
+          _kCreds,
+          jsonEncode({
+            'k': c.accessKeyId,
+            's': c.secretAccessKey,
+            't': c.sessionToken,
+            'e': c.expiration!.millisecondsSinceEpoch,
+          }),
+        );
+      }
     }
   }
 
@@ -58,10 +85,7 @@ class Identity {
     final res = await http
         .post(
           Uri.https('cognito-identity.${Config.awsRegion}.amazonaws.com', '/'),
-          headers: {
-            'Content-Type': 'application/x-amz-json-1.1',
-            'X-Amz-Target': 'AWSCognitoIdentityService.$target',
-          },
+          headers: {'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityService.$target'},
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 20));
@@ -92,7 +116,12 @@ class Identity {
     final logins = _logins(googleIdToken);
     Map<String, dynamic> r;
     try {
-      id ??= (await _call('GetId', {'IdentityPoolId': Config.identityPoolId, if (logins.isNotEmpty) 'Logins': logins}))['IdentityId'] as String;
+      id ??=
+          (await _call('GetId', {
+                'IdentityPoolId': Config.identityPoolId,
+                if (logins.isNotEmpty) 'Logins': logins,
+              }))['IdentityId']
+              as String;
       r = await _call('GetCredentialsForIdentity', {'IdentityId': id, if (logins.isNotEmpty) 'Logins': logins});
     } on IdentityError catch (e) {
       if (logins.isEmpty) {

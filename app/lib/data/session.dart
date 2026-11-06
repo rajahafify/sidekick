@@ -45,7 +45,8 @@ class Session extends ChangeNotifier implements Credentials {
     }
     if (started) {
       try {
-        if (!Config.useDevApi && _identity.google) await _refreshGoogle(interactive: false);
+        // Saved credentials cover a reload; when they've expired, credentials() renews them
+        // (for Google users, silently through Google if it can).
         await reloadProfile();
       } on IdentityError catch (e) {
         if (e.code == 'NeedsGoogle' || e.code == 'ResourceNotFoundException' || e.code == 'NotAuthorizedException') {
@@ -101,7 +102,9 @@ class Session extends ChangeNotifier implements Credentials {
     final google = GoogleSignIn.instance;
     await google.initialize(
       serverClientId: Config.googleWebClientId.isEmpty || kIsWeb ? null : Config.googleWebClientId,
-      clientId: kIsWeb ? Config.googleWebClientId : (Config.googleIosClientId.isEmpty ? null : Config.googleIosClientId),
+      clientId: kIsWeb
+          ? Config.googleWebClientId
+          : (Config.googleIosClientId.isEmpty ? null : Config.googleIosClientId),
     );
     if (kIsWeb) google.authenticationEvents.listen(_onWebEvent, onError: (Object e) => _webSignIns.add(e));
     _googleReady = true;
@@ -131,7 +134,18 @@ class Session extends ChangeNotifier implements Credentials {
     final google = GoogleSignIn.instance;
     GoogleSignInAccount? account;
     if (!interactive) {
-      account = await google.attemptLightweightAuthentication();
+      if (kIsWeb) {
+        // On the web, Google's silent sign-in answers through the events stream, not the future.
+        final next = google.authenticationEvents
+            .where((e) => e is GoogleSignInAuthenticationEventSignIn)
+            .map<GoogleSignInAccount?>((e) => (e as GoogleSignInAuthenticationEventSignIn).user)
+            .first
+            .timeout(const Duration(seconds: 10), onTimeout: () => null)
+            .catchError((Object _) => null);
+        account = await google.attemptLightweightAuthentication() ?? await next;
+      } else {
+        account = await google.attemptLightweightAuthentication();
+      }
     } else {
       account = await google.authenticate();
     }

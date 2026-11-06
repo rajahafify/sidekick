@@ -77,8 +77,9 @@ export class DynamoStore implements Store {
       const r = await this.db.send(
         new QueryCommand({
           TableName: this.table,
-          KeyConditionExpression: 'pk = :pk AND begins_with(sk, :p)',
-          ExpressionAttributeValues: { ':pk': pk, ':p': prefix },
+          // DynamoDB rejects begins_with on an empty string, so an empty prefix means "the whole item".
+          KeyConditionExpression: prefix ? 'pk = :pk AND begins_with(sk, :p)' : 'pk = :pk',
+          ExpressionAttributeValues: prefix ? { ':pk': pk, ':p': prefix } : { ':pk': pk },
           ExclusiveStartKey: start,
           Limit: limit - out.length,
         }),

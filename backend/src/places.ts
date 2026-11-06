@@ -25,9 +25,20 @@ const addressOf = (label: string | undefined, name: string) =>
     .slice(0, 3)
     .join(', ');
 
+// Autocomplete needs a position to rank around. Without the user's own, use the country's main city.
+const CAPITALS: Record<string, [number, number]> = {
+  MYS: [101.6869, 3.139], // Kuala Lumpur
+  SGP: [103.8198, 1.3521],
+  IDN: [106.8456, -6.2088], // Jakarta
+  THA: [100.5018, 13.7563], // Bangkok
+  PHL: [120.9842, 14.5995], // Manila
+  VNM: [106.6297, 10.8231], // Ho Chi Minh City
+};
+
 export function locationPlaces(region: string, countries: string[]): Places {
   const client = new GeoPlacesClient({ region });
   const filter = countries.length ? { IncludeCountries: countries } : undefined;
+  const fallbackBias = CAPITALS[countries[0] ?? 'MYS'] ?? CAPITALS.MYS;
   return {
     async suggest(input, near) {
       const r = await client.send(
@@ -35,7 +46,7 @@ export function locationPlaces(region: string, countries: string[]): Places {
           QueryText: input.slice(0, 200),
           MaxResults: 5,
           Filter: filter,
-          BiasPosition: near ? [near.lng, near.lat] : undefined,
+          BiasPosition: near ? [near.lng, near.lat] : fallbackBias,
         }),
       );
       return (r.ResultItems ?? [])
