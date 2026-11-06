@@ -19,6 +19,7 @@ new SidekickStack(app, 'Sidekick', {
   bedrockRegion: ctx('bedrockRegion', 'us-east-1'),
   alertEmail: ctx('alertEmail') || undefined,
   monthlyBudgetUsd: Number(ctx('monthlyBudgetUsd', '25')),
+  apiConcurrency: Number(ctx('apiConcurrency', '0')),
   placesCountries: ctx('placesCountries', 'MYS'),
   siteDomain: ctx('siteDomain') || undefined,
   siteCertificateArn: ctx('siteCertificateArn') || undefined,

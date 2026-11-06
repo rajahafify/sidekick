@@ -69,7 +69,7 @@ After that, every push to main that touches `app/` or `backend/` deploys again.
 
 **Optional, safer:** add `DeployRoleArn` as the secret `AWS_DEPLOY_ROLE_ARN`. The workflow then signs in with that role (GitHub OIDC, nothing stored) instead of the key, and you can delete the access key and the `github-deploy` user.
 
-Other settings, as repo variables: `MODEL_ID`, `SITE_DOMAIN`, `SITE_CERTIFICATE_ARN`, `ANDROID_CERT_SHA256`. For a manual deploy, `cd backend && npx cdk deploy -c googleClientId=...` also works (context keys: `monthlyBudgetUsd`, `llmProvider`, `modelId`, `bedrockRegion`, `placesCountries`, `githubRepo`, `githubOidcProviderArn`).
+Other settings, as repo variables: `MODEL_ID`, `SITE_DOMAIN`, `SITE_CERTIFICATE_ARN`, `ANDROID_CERT_SHA256`. For a manual deploy, `cd backend && npx cdk deploy -c googleClientId=...` also works (context keys: `monthlyBudgetUsd`, `apiConcurrency` (off by default; new accounts cannot reserve Lambda concurrency), `llmProvider`, `modelId`, `bedrockRegion`, `placesCountries`, `githubRepo`, `githubOidcProviderArn`).
 
 ### 4. Android builds
 CI builds the APK on every push (Actions → CI → `sidekick-apk` artifact). For a local build, copy `app/env.example.json` to `app/env.json`, fill it in with the deploy outputs, and run `cd app && flutter build apk --release --dart-define-from-file=env.json`.
