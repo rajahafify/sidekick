@@ -54,7 +54,7 @@ Do these once. Nothing here needs a Google Cloud billing account.
 4. Create another client → **Android**: package `com.artifisi.sidekick`, and the **SHA-1** of your release key (step 5). Add a second Android client with the debug key's SHA-1 if you want sign-in in debug builds (`cd app/android && ./gradlew signingReport`).
 
 ### 2. Bedrock model access (AWS console)
-In the Bedrock console in **us-east-1** → Model access, enable **Anthropic Claude Haiku 5.5** (Anthropic asks for a short use-case form the first time). Until it's enabled the sidekick uses its template, so nothing breaks.
+Models are on by default, but Anthropic asks for a one-time use-case form. In the Bedrock console in **us-east-1** → Model catalog → **Claude Haiku 5.5** → Open in playground, fill in the form that pops up, and send a test message. Until then the sidekick uses its template, so nothing breaks.
 
 ### 3. Deploy the backend (once, from CloudShell)
 Open **AWS CloudShell** (the `>_` icon in the AWS console), signed in as an admin of your account, in region **Asia Pacific (Singapore) ap-southeast-1**:
