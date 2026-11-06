@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
-/// Same palette as the web app: warm off-white ink on near-black, with a gold accent.
+/// White on pure black, with one accent (Signal) kept for the moments that matter:
+/// Connect, the sidekick's pick, live events and matches. Images are halftone dots (widgets/dots.dart).
 class C {
-  static const paper = Color(0xFF0B0B0D);
-  static const surface = Color(0xFF141416);
-  static const soft = Color(0xFF1C1C1F);
-  static const line = Color(0xFF2A2A2E);
-  static const ink = Color(0xFFF3EFE6);
-  static const onInk = Color(0xFF0B0B0D);
-  static const muted = Color(0xFF9B978E);
-  static const go = Color(0xFFD8BC86);
-  static const goSoft = Color(0xFF1F1B14);
-  static const danger = Color(0xFFF0A5A0);
+  static const paper = Color(0xFF000000);
+  static const surface = Color(0xFF111111);
+  static const soft = Color(0xFF1C1C1C);
+  static const line = Color(0xFF2A2A2A);
+  static const ink = Color(0xFFFFFFFF);
+  static const onInk = Color(0xFF000000);
+  static const muted = Color(0xFF8E8E8E);
+  static const go = Color(0xFFFF5A36);
+  static const goSoft = Color(0xFF2A100A);
+  static const danger = Color(0xFFFF8A80);
 }
 
 const display = 'InstrumentSerif';
@@ -37,7 +38,9 @@ ThemeData buildTheme() {
   return base.copyWith(
     scaffoldBackgroundColor: C.paper,
     splashFactory: InkSparkle.splashFactory,
-    textTheme: base.textTheme.apply(bodyColor: C.ink, displayColor: C.ink).copyWith(
+    textTheme: base.textTheme
+        .apply(bodyColor: C.ink, displayColor: C.ink)
+        .copyWith(
           bodyLarge: const TextStyle(fontSize: 17, height: 1.4, color: C.ink),
           bodyMedium: const TextStyle(fontSize: 15, height: 1.4, color: C.ink),
           bodySmall: const TextStyle(fontSize: 13, height: 1.35, color: C.muted),
@@ -70,7 +73,10 @@ ThemeData buildTheme() {
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(foregroundColor: C.go, textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+      style: TextButton.styleFrom(
+        foregroundColor: C.ink,
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -78,9 +84,18 @@ ThemeData buildTheme() {
       hintStyle: const TextStyle(color: C.muted),
       labelStyle: const TextStyle(color: C.muted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: C.line)),
-      enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: C.line)),
-      focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: C.go)),
+      border: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(color: C.line),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(color: C.line),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: const BorderSide(color: C.go),
+      ),
     ),
     chipTheme: base.chipTheme.copyWith(
       backgroundColor: C.surface,
@@ -91,14 +106,20 @@ ThemeData buildTheme() {
       showCheckmark: false,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: C.surface,
-      indicatorColor: C.goSoft,
+      backgroundColor: C.paper,
+      indicatorColor: C.go,
       surfaceTintColor: Colors.transparent,
       height: 68,
       iconTheme: WidgetStateProperty.resolveWith(
-          (s) => IconThemeData(color: s.contains(WidgetState.selected) ? C.go : C.muted)),
-      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
-          fontSize: 12, fontWeight: FontWeight.w500, color: s.contains(WidgetState.selected) ? C.ink : C.muted)),
+        (s) => IconThemeData(color: s.contains(WidgetState.selected) ? C.onInk : C.muted),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (s) => TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: s.contains(WidgetState.selected) ? C.ink : C.muted,
+        ),
+      ),
     ),
     snackBarTheme: const SnackBarThemeData(
       backgroundColor: C.soft,

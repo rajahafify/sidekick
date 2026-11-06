@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/identity.dart';
 import '../main.dart';
 import '../theme.dart';
+import '../widgets/dots.dart';
 import '../widgets/ui.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -45,12 +46,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('SIDEKICK', style: eyebrow),
+                    const Row(
+                      children: [
+                        QuestMark(size: 18),
+                        SizedBox(width: 10),
+                        Text('SIDEKICK', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 2)),
+                      ],
+                    ),
                     const SizedBox(height: 20),
                     const AspectRatio(aspectRatio: 1.1, child: RoomViz()),
                     const SizedBox(height: 28),
                     Text('Stay in the talk.', style: displayStyle(46)),
-                    Text('Your sidekick works the room.', style: displayStyle(46, color: C.go, style: FontStyle.italic)),
+                    Text(
+                      'Your sidekick works the room.',
+                      style: displayStyle(46, color: C.go, style: FontStyle.italic),
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'Check in to an event or a place. Your sidekick scouts everyone there and tells you who is worth meeting. '
@@ -67,7 +77,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     OutlinedButton(
                       onPressed: busy != null ? null : () => _run('guest', session.continueAsGuest),
                       child: busy == 'guest'
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: C.go),
+                            )
                           : const Text('Continue as guest'),
                     ),
                     const SizedBox(height: 12),
@@ -92,12 +106,15 @@ class _GoogleMark extends StatelessWidget {
   const _GoogleMark();
   @override
   Widget build(BuildContext context) => Container(
-        width: 22,
-        height: 22,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-        child: const Text('G', style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w700, fontSize: 14)),
-      );
+    width: 22,
+    height: 22,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+    child: const Text(
+      'G',
+      style: TextStyle(color: Color(0xFF4285F4), fontWeight: FontWeight.w700, fontSize: 14),
+    ),
+  );
 }
 
 class OfflineScreen extends StatelessWidget {
@@ -121,7 +138,7 @@ class OfflineScreen extends StatelessWidget {
 }
 
 /// A talk in progress, seen from above: the audience faces the stage, and their sidekicks
-/// quietly trade notes across the room. Gold links are the matches being found.
+/// quietly trade notes across the room. The accent links are the matches being found.
 class RoomViz extends StatefulWidget {
   const RoomViz({super.key});
   @override
@@ -139,20 +156,31 @@ class _RoomVizState extends State<RoomViz> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(28),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: C.paper,
+        border: Border.all(color: C.line),
         borderRadius: BorderRadius.circular(28),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: const RadialGradient(
-              center: Alignment(0, -0.9),
-              radius: 1.2,
-              colors: [Color(0xFF221D14), C.surface],
-            ),
-            border: Border.all(color: C.line),
-            borderRadius: BorderRadius.circular(28),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // The stage light, in dots.
+          const Dots(_spotlight, step: 9),
+          AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) => CustomPaint(painter: _RoomPainter(_c.value)),
           ),
-          child: AnimatedBuilder(animation: _c, builder: (_, _) => CustomPaint(painter: _RoomPainter(_c.value))),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
+}
+
+double _spotlight(Offset p, Size s) {
+  final d = (p - Offset(s.width / 2, s.height * 0.1)).distance / (s.longestSide * 0.95);
+  return (0.75 * (1 - d) * (1 - d)).clamp(0.0, 1.0);
 }
 
 class _RoomPainter extends CustomPainter {
@@ -185,9 +213,10 @@ class _RoomPainter extends CustomPainter {
   void paint(Canvas canvas, Size s) {
     // Stage and speaker.
     final stage = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(s.width / 2, s.height * 0.13), width: s.width * 0.5, height: s.height * 0.07),
-        const Radius.circular(10));
-    canvas.drawRRect(stage, Paint()..color = C.soft);
+      Rect.fromCenter(center: Offset(s.width / 2, s.height * 0.13), width: s.width * 0.5, height: s.height * 0.07),
+      const Radius.circular(10),
+    );
+    canvas.drawRRect(stage, Paint()..color = C.paper);
     final pulse = 0.5 + 0.5 * math.sin(t * 2 * math.pi * 6);
     canvas.drawCircle(Offset(s.width / 2, s.height * 0.13), 5 + pulse * 1.5, Paint()..color = C.ink);
     for (var k = 1; k <= 3; k++) {
@@ -241,10 +270,10 @@ class _RoomPainter extends CustomPainter {
       final p = seat(i, s);
       final glow = lit[i] ?? 0;
       if (glow > 0) {
-        canvas.drawCircle(p, 11, Paint()..color = C.go.withValues(alpha: 0.12 * glow));
+        canvas.drawCircle(p, 12, Paint()..color = C.go.withValues(alpha: 0.18 * glow));
       }
-      canvas.drawCircle(p, 5.2, Paint()..color = Color.lerp(C.line, C.go, glow)!);
-      canvas.drawCircle(p.translate(0, -1.2), 2.2, Paint()..color = Color.lerp(C.soft, C.goSoft, glow)!);
+      canvas.drawCircle(p, 6.4, Paint()..color = C.paper);
+      canvas.drawCircle(p, 4.6, Paint()..color = Color.lerp(const Color(0xFFBDBDBD), C.go, glow)!);
     }
   }
 
