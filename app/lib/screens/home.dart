@@ -45,7 +45,7 @@ class _TabBar extends StatelessWidget {
     }
 
     return Container(
-      decoration: const BoxDecoration(color: C.paper, border: Border(top: BorderSide(color: C.line))),
+      decoration: BoxDecoration(color: C.paper, border: Border(top: BorderSide(color: C.line))),
       child: SafeArea(
         top: false,
         child: SizedBox(
@@ -66,7 +66,7 @@ class _TabBar extends StatelessWidget {
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: () => _addSheet(context),
-                  child: const SizedBox(width: 60, height: 60, child: Icon(Icons.add_rounded, size: 32, color: C.onInk)),
+                  child: SizedBox(width: 60, height: 60, child: Icon(Icons.add_rounded, size: 32, color: C.onInk)),
                 ),
               ),
             ),
@@ -86,7 +86,7 @@ void _addSheet(BuildContext context) => showModalBottomSheet<void>(
               contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
               leading: Icon(icon, color: C.go),
               title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-              subtitle: Text(text, style: const TextStyle(color: C.muted)),
+              subtitle: Text(text, style: TextStyle(color: C.muted)),
               onTap: () {
                 Navigator.pop(sheet);
                 path == '/places' ? context.go(path) : context.push(path);
@@ -167,7 +167,7 @@ class _EventsTabState extends State<EventsTab> {
             const SizedBox(height: 30),
             Text(first.isEmpty ? 'Hello' : 'Hi $first', style: displayStyle(44)),
             const SizedBox(height: 10),
-            const Text('Going to an event? Tap + to add it, or scan the QR code at the door.',
+            Text('Going to an event? Tap + to add it, or scan the QR code at the door.',
                 style: TextStyle(color: C.muted, fontSize: 17, height: 1.45)),
             if (session.guest) ...[
               const SizedBox(height: 18),
@@ -182,10 +182,10 @@ class _EventsTabState extends State<EventsTab> {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(color: C.go.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.my_location, color: C.go, size: 20),
+                  child: Icon(Icons.my_location, color: C.go, size: 20),
                 ),
                 const SizedBox(width: 14),
-                const Expanded(
+                Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Check in to a place', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                     SizedBox(height: 2),
@@ -193,7 +193,7 @@ class _EventsTabState extends State<EventsTab> {
                         style: TextStyle(color: C.muted, fontSize: 14, height: 1.35)),
                   ]),
                 ),
-                const Icon(Icons.chevron_right, color: C.muted),
+                Icon(Icons.chevron_right, color: C.muted),
               ]),
             ),
             if (error != null) ErrorNote(error),
@@ -204,7 +204,7 @@ class _EventsTabState extends State<EventsTab> {
                 onTap: () => setState(() => past = !past),
                 child: Text.rich(TextSpan(children: [
                   TextSpan(text: 'Upcoming', style: TextStyle(color: past ? C.muted : C.ink)),
-                  const TextSpan(text: '  ·  ', style: TextStyle(color: C.muted)),
+                  TextSpan(text: '  ·  ', style: TextStyle(color: C.muted)),
                   TextSpan(text: 'Past', style: TextStyle(color: past ? C.ink : C.muted)),
                 ]), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               ),
@@ -215,7 +215,7 @@ class _EventsTabState extends State<EventsTab> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(past ? 'Events you went to show up here.' : "Events you join show up here.",
-                    style: const TextStyle(color: C.muted)),
+                    style: TextStyle(color: C.muted)),
               )
             else
               for (final e in shown!) _EventRow(id: e.id, name: e.name, place: e.place, start: e.startsAt, end: e.endsAt, place2: e.kind == 'place'),
@@ -224,7 +224,7 @@ class _EventsTabState extends State<EventsTab> {
             if (others == null && error == null)
               const Padding(padding: EdgeInsets.all(24), child: Loading())
             else if ((others ?? []).isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text('Nothing on right now. Add one with +.', style: TextStyle(color: C.muted)),
               )
@@ -283,10 +283,10 @@ class _EventRow extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 if (place2) ...[
-                  const Icon(Icons.my_location, color: C.go, size: 14),
+                  Icon(Icons.my_location, color: C.go, size: 14),
                   const SizedBox(width: 7),
                 ] else if (live) ...[
-                  Container(width: 7, height: 7, decoration: const BoxDecoration(color: C.go, shape: BoxShape.circle)),
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: C.go, shape: BoxShape.circle)),
                   const SizedBox(width: 7),
                 ],
                 Flexible(
@@ -298,11 +298,11 @@ class _EventRow extends StatelessWidget {
               ]),
               if (sub.isNotEmpty) ...[
                 const SizedBox(height: 3),
-                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: C.muted, fontSize: 14)),
+                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: C.muted, fontSize: 14)),
               ],
             ]),
           ),
-          const Icon(Icons.chevron_right, color: C.muted),
+          Icon(Icons.chevron_right, color: C.muted),
         ]),
       ),
     );
@@ -329,7 +329,7 @@ class MeTab extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(p?.displayName ?? '', style: displayStyle(32)),
                 if ((p?.headline ?? '').isNotEmpty)
-                  Text(p!.headline, style: const TextStyle(color: C.muted, fontSize: 15)),
+                  Text(p!.headline, style: TextStyle(color: C.muted, fontSize: 15)),
                 const SizedBox(height: 6),
                 Tag(session.guest ? 'Guest' : 'Signed in with Google', highlight: !session.guest),
               ]),
@@ -338,13 +338,13 @@ class MeTab extends StatelessWidget {
           const SizedBox(height: 22),
           if (p != null) ...[
             if (p.lookingFor.isNotEmpty) ...[
-              const Text('Looking for', style: TextStyle(color: C.muted, fontSize: 13)),
+              Text('Looking for', style: TextStyle(color: C.muted, fontSize: 13)),
               const SizedBox(height: 8),
               Wrap(spacing: 6, runSpacing: 6, children: [for (final t in p.lookingFor) Tag(t)]),
               const SizedBox(height: 16),
             ],
             if (p.offering.isNotEmpty) ...[
-              const Text('Can offer', style: TextStyle(color: C.muted, fontSize: 13)),
+              Text('Can offer', style: TextStyle(color: C.muted, fontSize: 13)),
               const SizedBox(height: 8),
               Wrap(spacing: 6, runSpacing: 6, children: [for (final t in p.offering) Tag(t)]),
               const SizedBox(height: 16),
@@ -359,15 +359,27 @@ class MeTab extends StatelessWidget {
               child: const Text('Sign in with Google'),
             ),
           const SizedBox(height: 24),
+          const SectionLabel('Appearance'),
+          SegmentedButton<ThemeChoice>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: ThemeChoice.system, label: Text('System')),
+              ButtonSegment(value: ThemeChoice.light, label: Text('Light')),
+              ButtonSegment(value: ThemeChoice.dark, label: Text('Dark')),
+            ],
+            selected: {session.theme},
+            onSelectionChanged: (choice) => session.setTheme(choice.first),
+          ),
+          const SizedBox(height: 28),
           const SidekickStatusCard(),
           const SizedBox(height: 20),
           const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.logout, color: C.muted),
+            leading: Icon(Icons.logout, color: C.muted),
             title: Text(session.guest ? 'Leave guest mode' : 'Sign out'),
             subtitle: session.guest
-                ? const Text('Guest profiles can’t be recovered after you leave.', style: TextStyle(color: C.muted))
+                ? Text('Guest profiles can’t be recovered after you leave.', style: TextStyle(color: C.muted))
                 : null,
             onTap: () async {
               if (session.guest && !await _confirm(context, 'Leave guest mode?', 'Your guest profile and check-ins will be lost.')) {
@@ -378,8 +390,8 @@ class MeTab extends StatelessWidget {
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.delete_outline, color: C.danger),
-            title: const Text('Delete my account', style: TextStyle(color: C.danger)),
+            leading: Icon(Icons.delete_outline, color: C.danger),
+            title: Text('Delete my account', style: TextStyle(color: C.danger)),
             onTap: () async {
               if (!await _confirm(context, 'Delete your account?',
                   'Your profile and check-ins are deleted, and you leave every event. This can’t be undone.')) {
@@ -405,8 +417,8 @@ Future<bool> _confirm(BuildContext context, String title, String text) async =>
         title: Text(title),
         content: Text(text),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel', style: TextStyle(color: C.muted))),
-          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Yes', style: TextStyle(color: C.danger))),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Cancel', style: TextStyle(color: C.muted))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text('Yes', style: TextStyle(color: C.danger))),
         ],
       ),
     ) ==

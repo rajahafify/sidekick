@@ -60,8 +60,8 @@ class _MatchScreenState extends State<MatchScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(leading: const Icon(Icons.block), title: const Text('Block'), onTap: () => Navigator.pop(c, 'block')),
           ListTile(
-            leading: const Icon(Icons.flag_outlined, color: C.danger),
-            title: const Text('Report and block', style: TextStyle(color: C.danger)),
+            leading: Icon(Icons.flag_outlined, color: C.danger),
+            title: Text('Report and block', style: TextStyle(color: C.danger)),
             onTap: () => Navigator.pop(c, 'report'),
           ),
           const SizedBox(height: 8),
@@ -93,10 +93,10 @@ class _MatchScreenState extends State<MatchScreen> {
         title: const Text('What happened?'),
         content: TextField(controller: c, maxLength: 500, maxLines: 4, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel', style: TextStyle(color: C.muted))),
+          TextButton(onPressed: () => Navigator.pop(d), child: Text('Cancel', style: TextStyle(color: C.muted))),
           TextButton(
             onPressed: () => Navigator.pop(d, c.text.trim().isEmpty ? 'No reason given' : c.text.trim()),
-            child: const Text('Report', style: TextStyle(color: C.danger)),
+            child: Text('Report', style: TextStyle(color: C.danger)),
           ),
         ],
       ),
@@ -113,7 +113,7 @@ class _MatchScreenState extends State<MatchScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               children: [
-                const Row(
+                Row(
                   children: [
                     SidekickMark(size: 16, mood: BuddyMood.happy),
                     SizedBox(width: 8),
@@ -125,7 +125,7 @@ class _MatchScreenState extends State<MatchScreen> {
                 const SizedBox(height: 16),
                 Text(d.person.displayName, style: displayStyle(40)),
                 if (d.person.headline.isNotEmpty)
-                  Text(d.person.headline, style: const TextStyle(color: C.muted, fontSize: 16)),
+                  Text(d.person.headline, style: TextStyle(color: C.muted, fontSize: 16)),
                 const SizedBox(height: 22),
                 SurfaceCard(
                   padding: EdgeInsets.zero,
@@ -144,11 +144,11 @@ class _MatchScreenState extends State<MatchScreen> {
                   ]),
                 ),
                 const SizedBox(height: 26),
-                const Text('YOUR SIDEKICKS TALKED', style: eyebrow),
+                Text('YOUR SIDEKICKS TALKED', style: eyebrow),
                 const SizedBox(height: 12),
                 for (final t in d.exchange.turns) _Bubble(mine: t.speaker != widget.other, text: t.text),
                 const SizedBox(height: 14),
-                Text(d.exchange.reason, style: const TextStyle(color: C.muted, fontSize: 15, height: 1.4)),
+                Text(d.exchange.reason, style: TextStyle(color: C.muted, fontSize: 15, height: 1.4)),
                 const SizedBox(height: 22),
                 Container(
                   padding: const EdgeInsets.all(18),
@@ -177,7 +177,7 @@ class _MatchScreenState extends State<MatchScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text('Say hi to ${firstName(d.person.displayName)} at the break, or send a message.',
-                    textAlign: TextAlign.center, style: const TextStyle(color: C.muted, fontSize: 14)),
+                    textAlign: TextAlign.center, style: TextStyle(color: C.muted, fontSize: 14)),
               ],
             ),
     );
@@ -195,8 +195,8 @@ class _ContactRow extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
         leading: Icon(icon, color: C.go),
         title: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(label, style: const TextStyle(color: C.muted)),
-        trailing: const Icon(Icons.open_in_new, color: C.muted, size: 18),
+        subtitle: Text(label, style: TextStyle(color: C.muted)),
+        trailing: Icon(Icons.open_in_new, color: C.muted, size: 18),
         onTap: onTap,
       );
 }

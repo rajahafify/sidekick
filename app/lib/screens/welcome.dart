@@ -62,25 +62,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final slides = [
       _Slide(
         art: const _FigCard(label: 'THE ROOM', child: RoomViz()),
-        title: [Text('Stay in the talk.', style: displayStyle(42))],
-        rich: TextSpan(children: [
-          TextSpan(text: 'Your sidekick ', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
-          TextSpan(text: 'works the room.', style: displayStyle(42)),
+        top: 'Stay in the talk.',
+        title: (s) => TextSpan(children: [
+          TextSpan(text: 'Your sidekick ', style: displayStyle(s, color: C.go, style: FontStyle.italic)),
+          TextSpan(text: 'works the room.', style: displayStyle(s)),
         ]),
         text: 'Talks or networking? Have both. Your sidekick scouts everyone at the event while you listen.',
       ),
       _Slide(
         art: const _Notes(),
-        title: [Text('It finds the people', style: displayStyle(42))],
-        rich: TextSpan(text: 'worth meeting', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
+        top: 'It finds the people',
+        title: (s) => TextSpan(text: 'worth meeting', style: displayStyle(s, color: C.go, style: FontStyle.italic)),
         text: 'It reads what everyone is looking for and can offer, and tells you why each person is worth your time.',
       ),
       _Slide(
         art: const _MatchArt(),
-        title: const [],
-        rich: TextSpan(children: [
-          TextSpan(text: 'Swipe. Match. ', style: displayStyle(42)),
-          TextSpan(text: 'Say hi.', style: displayStyle(42, color: C.go, style: FontStyle.italic)),
+        title: (s) => TextSpan(children: [
+          TextSpan(text: 'Swipe. Match. ', style: displayStyle(s)),
+          TextSpan(text: 'Say hi.', style: displayStyle(s, color: C.go, style: FontStyle.italic)),
         ]),
         text: 'Connect or pass. When you both connect, you swap contacts and get an opener for the break. Nobody sees who passed.',
       ),
@@ -92,12 +91,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
+              padding: const EdgeInsets.fromLTRB(22, 8, 22, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Center(child: Wordmark()),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 8),
+                  // The slides take whatever height is left, so the words and both sign-in
+                  // buttons fit on one screen without scrolling.
                   Expanded(
                     child: ScrollConfiguration(
                       // Let a mouse drag the slides too, not only touch.
@@ -105,13 +106,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad},
                       ),
                       child: PageView(
-                      controller: _pages,
-                      onPageChanged: (i) => setState(() => page = i),
-                      children: slides,
+                        controller: _pages,
+                        onPageChanged: (i) => setState(() => page = i),
+                        children: slides,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     for (var i = 0; i < slides.length; i++)
                       GestureDetector(
@@ -128,7 +129,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         ),
                       ),
                   ]),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   GoogleButton(
                     enabled: busy == null,
                     onResult: (e) {
@@ -139,12 +140,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   OutlinedButton(
                     onPressed: busy != null ? null : () => _run('guest', session.continueAsGuest),
                     child: busy == 'guest'
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
                         : const Text('Continue as guest'),
                   ),
                   ErrorNote(error),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Both sides opt in. Contacts stay hidden until you match.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: C.muted, fontSize: 13),
@@ -160,37 +161,46 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 }
 
 class _Slide extends StatelessWidget {
-  const _Slide({required this.art, required this.title, required this.rich, required this.text});
+  const _Slide({required this.art, this.top, required this.title, required this.text});
   final Widget art;
-  final List<Widget> title;
-  final TextSpan rich;
+
+  /// A plain first line above the title, if the slide has one.
+  final String? top;
+
+  /// The title's coloured words, at the size the slide can afford.
+  final TextSpan Function(double size) title;
   final String text;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, c) => SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: c.maxHeight),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                art,
-                const SizedBox(height: 30),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  ...title,
-                  Text.rich(rich),
-                  const SizedBox(height: 14),
-                  Text(text, style: const TextStyle(color: C.muted, fontSize: 16.5, height: 1.5)),
-                ]),
-              ],
-            ),
-          ),
-        ),
+        builder: (context, c) {
+          // Short screens get smaller type, so the words still fit under the picture.
+          final short = c.maxHeight < 560;
+          final size = short ? 34.0 : 42.0;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // The picture takes the height left over above the words, and keeps its shape.
+              Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: SizedBox(width: c.maxWidth, child: art),
+                  ),
+                ),
+              ),
+              SizedBox(height: short ? 14 : 24),
+              if (top != null) Text(top!, style: displayStyle(size)),
+              Text.rich(title(size)),
+              const SizedBox(height: 12),
+              Text(text, style: TextStyle(color: C.muted, fontSize: short ? 15 : 16.5, height: 1.5)),
+            ],
+          );
+        },
       );
 }
 
-const _mono = TextStyle(fontFamily: 'monospace', fontSize: 11, color: C.muted, letterSpacing: 0.6);
+TextStyle get _mono => TextStyle(fontFamily: 'monospace', fontSize: 11, color: C.muted, letterSpacing: 0.6);
 
 /// A figure card: "Fig 1" and a label on top, the drawing, and a caption the drawing provides.
 class _FigCard extends StatelessWidget {
@@ -203,14 +213,14 @@ class _FigCard extends StatelessWidget {
         aspectRatio: 1.25,
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0A),
+            color: C.surface,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: C.line),
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(children: [
             Positioned.fill(child: child),
-            const Positioned(left: 14, top: 12, child: Text('Fig 1', style: _mono)),
+            Positioned(left: 14, top: 12, child: Text('Fig 1', style: _mono)),
             Positioned(right: 14, top: 12, child: Text(label, style: _mono)),
           ]),
         ),
@@ -294,8 +304,8 @@ class _RoomPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..color = C.ink.withValues(alpha: 0.22);
-    final fill = Paint()..color = const Color(0xFF0E0E0E);
-    final top = Paint()..color = const Color(0xFF161616);
+    final fill = Paint()..color = C.paper;
+    final top = Paint()..color = C.soft;
 
     // The floor slab, with a little thickness.
     const x0 = -3.6, x1 = 3.4, y0 = -3.4, y1 = 3.8, h = 0.35;
@@ -432,7 +442,7 @@ class _Notes extends StatelessWidget {
             Expanded(
               child: Container(
                 padding: const EdgeInsets.only(left: 12),
-                decoration: const BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
+                decoration: BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('YOUR SIDEKICK', style: eyebrow.copyWith(fontSize: 10.5)),
                   const SizedBox(height: 4),
@@ -474,7 +484,7 @@ class _MatchArt extends StatelessWidget {
     return AspectRatio(
       aspectRatio: 1.25,
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        const Text("IT'S A MATCH", style: eyebrow),
+        Text("IT'S A MATCH", style: eyebrow),
         const SizedBox(height: 16),
         SizedBox(
           width: 176,

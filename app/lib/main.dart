@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'config.dart';
 import 'data/session.dart';
+import 'models.dart';
 import 'screens/admin.dart';
 import 'screens/check_in.dart';
 import 'screens/event.dart';
@@ -20,18 +22,27 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Real paths on the web (sidekick.artifisi.com/e/<id>), not #/ links.
   usePathUrlStrategy();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: C.paper,
-  ));
   if (!Config.configured) {
+    SystemChrome.setSystemUIOverlayStyle(_chrome(Brightness.dark));
     runApp(const _NotConfigured());
     return;
   }
   final session = Session();
+  // Read the person's own theme before the first frame, so the app doesn't flash the wrong look.
+  await session.loadTheme();
   runApp(SidekickApp(session: session));
   await session.start();
+}
+
+/// Status bar and navigation bar, matching the look in use.
+SystemUiOverlayStyle _chrome(Brightness b) {
+  final light = b == Brightness.light;
+  return SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: light ? Brightness.dark : Brightness.light,
+    systemNavigationBarColor: C.paper,
+    systemNavigationBarIconBrightness: light ? Brightness.dark : Brightness.light,
+  );
 }
 
 class SidekickApp extends StatefulWidget {
@@ -42,8 +53,56 @@ class SidekickApp extends StatefulWidget {
   State<SidekickApp> createState() => _SidekickAppState();
 }
 
-class _SidekickAppState extends State<SidekickApp> {
+class _SidekickAppState extends State<SidekickApp> with WidgetsBindingObserver {
   late final GoRouter router = _router(widget.session);
+  ThemeChoice? _shown;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.session.addListener(_onChange);
+    _syncTheme();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.session.removeListener(_onChange);
+    super.dispose();
+  }
+
+  // The phone or browser switched between light and dark: "system" follows it.
+  @override
+  void didChangePlatformBrightness() => _onChange();
+
+  void _onChange() {
+    if (!_syncTheme()) return;
+    // Screens read the colours while they build, and some are not rebuilt by their parent (a const
+    // route, or the tab bar under it). So mark every element dirty: the whole app rebuilds once,
+    // in the new colours, and screens keep their state.
+    _rebuildEverything(WidgetsBinding.instance.rootElement);
+    if (mounted) setState(() {});
+  }
+
+  static void _rebuildEverything(Element? e) {
+    if (e == null) return;
+    e.markNeedsBuild();
+    e.visitChildren(_rebuildEverything);
+  }
+
+  /// Points the colours in use (C) at the look to show. Returns true if the look changed, so the
+  /// app rebuilds with it.
+  bool _syncTheme() {
+    final choice = widget.session.theme;
+    final platform = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final b = brightnessOf(choice, platform);
+    if (choice == _shown && b == C.brightness) return false;
+    _shown = choice;
+    C.use(b);
+    SystemChrome.setSystemUIOverlayStyle(_chrome(b));
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) => SessionScope(
@@ -51,12 +110,47 @@ class _SidekickAppState extends State<SidekickApp> {
         child: MaterialApp.router(
           title: 'Sidekick',
           debugShowCheckedModeBanner: false,
-          theme: buildTheme(),
-          darkTheme: buildTheme(),
-          themeMode: ThemeMode.dark,
+          theme: buildTheme(Palette.light),
+          darkTheme: buildTheme(Palette.dark),
+          themeMode: themeModeOf(widget.session.theme),
           routerConfig: router,
+          builder: (context, child) => _PhoneFrame(child: child ?? const SizedBox.shrink()),
         ),
       );
+}
+
+/// On a wide browser window the app is a phone-width column in the middle, not a page stretched
+/// edge to edge. Phones, and the admin site (which has its own layout), get the full width.
+class _PhoneFrame extends StatelessWidget {
+  const _PhoneFrame({required this.child});
+  final Widget child;
+
+  static const width = 560.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    if (!kIsWeb || Config.adminHost || media.size.width < width + 120) return child;
+    return ColoredBox(
+      color: C.surface,
+      child: Center(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: C.paper,
+            border: Border.symmetric(vertical: BorderSide(color: C.line)),
+          ),
+          child: SizedBox(
+            width: width,
+            height: media.size.height,
+            child: MediaQuery(
+              data: media.copyWith(size: Size(width, media.size.height)),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Gives every screen the session (who's signed in, their profile, and the data layer).
@@ -130,7 +224,7 @@ class _NotConfigured extends StatelessWidget {
   const _NotConfigured();
   @override
   Widget build(BuildContext context) => MaterialApp(
-        theme: buildTheme(),
+        theme: buildTheme(Palette.dark),
         home: const Scaffold(
           body: SafeArea(
             child: EmptyState(

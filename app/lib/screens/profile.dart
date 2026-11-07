@@ -36,7 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     headline = TextEditingController(text: p?.headline ?? '');
     about = TextEditingController(text: p?.about ?? '');
     linkedin = TextEditingController(text: p?.contact.linkedin ?? '');
-    email = TextEditingController(text: p?.contact.email ?? '');
+    // Google already knows your email: start from it, so nobody has to type it.
+    email = TextEditingController(text: p?.contact.email.isNotEmpty == true ? p!.contact.email : s.googleEmail);
     phone = TextEditingController(text: p?.contact.phone ?? '');
     lookingFor = [...?p?.lookingFor];
     offering = [...?p?.offering];
@@ -97,8 +98,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text(first ? '' : 'Your profile'),
         actions: [
           if (first)
-            TextButton(onPressed: session.signOut, child: const Text('Cancel', style: TextStyle(color: C.muted))),
+            TextButton(onPressed: session.signOut, child: Text('Cancel', style: TextStyle(color: C.muted))),
         ],
+      ),
+      // The main button stays in view, so the form never needs scrolling to reach it.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ErrorNote(error),
+            const SizedBox(height: 4),
+            FilledButton(
+              onPressed: saving ? null : _save,
+              child: saving ? const ButtonProgress() : Text(first ? 'Done' : 'Save'),
+            ),
+          ]),
+        ),
       ),
       body: Form(
         key: _form,
@@ -106,11 +122,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
           children: [
             if (first) ...[
-              const Text('YOUR SIDEKICK', style: eyebrow),
+              Text('YOUR SIDEKICK', style: eyebrow),
               const SizedBox(height: 10),
               Text('Brief your sidekick', style: displayStyle(40)),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'It uses this to find the people worth your time, and to pitch you to theirs.',
                 style: TextStyle(color: C.muted, fontSize: 16),
               ),
@@ -157,9 +173,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 22),
-            const Text('HOW TO REACH YOU', style: eyebrow),
+            Text('HOW TO REACH YOU', style: eyebrow),
             const SizedBox(height: 6),
-            const Text('Only shared with people you both connect with.', style: TextStyle(color: C.muted, fontSize: 14)),
+            Text('Only shared with people you both connect with.', style: TextStyle(color: C.muted, fontSize: 14)),
             const SizedBox(height: 14),
             TextFormField(
               controller: linkedin,
@@ -172,7 +188,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: email,
               maxLength: 120,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email', counterText: ''),
+              decoration: InputDecoration(
+                labelText: 'Email',
+                helperText: session.googleEmail.isEmpty ? null : 'From your Google account',
+                counterText: '',
+              ),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -180,12 +200,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               maxLength: 40,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'Phone or WhatsApp', counterText: ''),
-            ),
-            ErrorNote(error),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: saving ? null : _save,
-              child: saving ? const ButtonProgress() : Text(first ? 'Done' : 'Save'),
             ),
           ],
         ),
@@ -206,7 +220,7 @@ class _TagPicker extends StatelessWidget {
         children: [
           Row(children: [
             Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
-            Text('${selected.length}/$maxTags', style: const TextStyle(color: C.muted, fontSize: 13)),
+            Text('${selected.length}/$maxTags', style: TextStyle(color: C.muted, fontSize: 13)),
           ]),
           const SizedBox(height: 10),
           Wrap(

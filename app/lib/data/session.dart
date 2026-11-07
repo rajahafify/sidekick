@@ -23,9 +23,10 @@ class Session extends ChangeNotifier implements Credentials {
   bool ready = false;
   Profile? profile;
 
-  /// Name and photo from Google, to fill in the profile form the first time.
-  String googleName = '';
-  String googlePhoto = '';
+  /// Name, email and photo from Google, to fill in the profile form the first time.
+  String get googleName => _identity.googleName;
+  String get googleEmail => _identity.googleEmail;
+  String get googlePhoto => _identity.googlePhoto;
 
   /// Set when we couldn't reach the server at start-up.
   String? startError;
@@ -65,6 +66,45 @@ class Session extends ChangeNotifier implements Credentials {
   Future<void> reloadProfile() async {
     final r = await api.me();
     profile = r.profile;
+    _defaultTheme = r.defaultTheme;
+    notifyListeners();
+  }
+
+  // ---------- Theme ----------
+
+  static const _kTheme = 'theme';
+  ThemeChoice? _ownTheme;
+  ThemeChoice _defaultTheme = ThemeChoice.dark;
+
+  /// The look in use: this person's own pick, else the admin's default.
+  ThemeChoice get theme => _ownTheme ?? _defaultTheme;
+
+  /// The admin's default, for people who haven't picked their own.
+  ThemeChoice get defaultTheme => _defaultTheme;
+
+  /// Reads this person's own pick. Called before the first frame, so the app doesn't flash the
+  /// wrong look.
+  Future<void> loadTheme() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final saved = p.getString(_kTheme);
+      _ownTheme = saved == null ? null : ThemeChoice.parse(saved);
+    } catch (_) {}
+  }
+
+  Future<void> setTheme(ThemeChoice c) async {
+    _ownTheme = c;
+    notifyListeners();
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_kTheme, c.name);
+    } catch (_) {}
+  }
+
+  /// Admins only: the look for everyone who hasn't picked their own.
+  Future<void> setDefaultTheme(ThemeChoice c) async {
+    await api.adminSetDefaultTheme(c);
+    _defaultTheme = c;
     notifyListeners();
   }
 
@@ -122,8 +162,9 @@ class Session extends ChangeNotifier implements Credentials {
   }
 
   String _tokenOf(GoogleSignInAccount account) {
-    googleName = account.displayName ?? '';
-    googlePhoto = account.photoUrl ?? '';
+    _identity.googleName = account.displayName ?? '';
+    _identity.googleEmail = account.email;
+    _identity.googlePhoto = account.photoUrl ?? '';
     final token = account.authentication.idToken;
     if (token == null) throw IdentityError("Google didn't return a sign-in token. Try again.");
     return token;

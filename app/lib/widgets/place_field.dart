@@ -58,7 +58,7 @@ class _PlaceFieldState extends State<PlaceField> {
               labelText: widget.label,
               hintText: widget.hint,
               counterText: '',
-              prefixIcon: const Icon(Icons.place_outlined, color: C.muted),
+              prefixIcon: Icon(Icons.place_outlined, color: C.muted),
             ),
           ),
           if (suggestions.isNotEmpty)
@@ -75,7 +75,7 @@ class _PlaceFieldState extends State<PlaceField> {
                     ListTile(
                       dense: true,
                       title: Text(p.name, style: const TextStyle(fontSize: 15)),
-                      subtitle: p.address.isEmpty ? null : Text(p.address, style: const TextStyle(color: C.muted)),
+                      subtitle: p.address.isEmpty ? null : Text(p.address, style: TextStyle(color: C.muted)),
                       onTap: () {
                         final label = p.label.length > 140 ? p.label.substring(0, 140) : p.label;
                         _picked = label;

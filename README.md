@@ -10,7 +10,7 @@ Everything runs on AWS, in one CDK stack.
 
 | Part | Where | What |
 |---|---|---|
-| App | `app/` | Flutter: the same app is the Android app and the website at sidekick.artifisi.com. White on black, halftone dots, Signal orange. |
+| App | `app/` | Flutter: the same app is the Android app and the website at sidekick.artifisi.com. Dark is white on black, light is black on white (each person picks, the admin sets the default). Halftone dots, Signal orange. |
 | Identity | Cognito identity pool | A guest gets an unauthenticated identity. Google sign-in is linked to that same identity, so a guest keeps their data. Both get short-lived AWS credentials that can only call the API. |
 | API | API Gateway (HTTP API, IAM auth) → Lambda (`backend/src`) | One Node 22 Lambda. API Gateway checks each request's signature and tells the Lambda who is calling and whether they're a guest. |
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
@@ -97,7 +97,7 @@ To use a key you made yourself instead, add the secrets `ANDROID_KEYSTORE_BASE64
 After that, every push to main rebuilds the site, and every PR gets a preview link. Add the `*.pages.dev` address as a JavaScript origin on the Google Web client if you want sign-in on previews. (The AWS stack also still creates a CloudFront site, `SiteUrl`; it's unused and costs next to nothing.)
 
 ### 7. Admin site: admin-sidekick.artifisi.com
-The admin screen lists open reports, every event and everyone, and can delete them. It is the same web build: on a host name starting with `admin-` the app shows only the admin screen (elsewhere it's at `/admin`).
+The admin screen lists open reports, every event and everyone, and can delete them. It also sets the default theme (system, light or dark) for people who haven't picked their own. It is the same web build: on a host name starting with `admin-` the app shows only the admin screen (elsewhere it's at `/admin`).
 1. The Pages project → Custom domains → add `admin-sidekick.artifisi.com`.
 2. Google Web client → Authorized JavaScript origins → add `https://admin-sidekick.artifisi.com`.
 3. Open the admin site and sign in with Google. It shows your account id. Add it to the repo variable `ADMIN_IDENTITY_IDS` (comma-separated for several admins), then run **Deploy** again.

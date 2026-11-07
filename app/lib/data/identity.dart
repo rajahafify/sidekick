@@ -21,10 +21,19 @@ class Identity {
   static const _kId = 'identityId';
   static const _kGoogle = 'signedInWithGoogle';
   static const _kCreds = 'awsCredentials';
+  static const _kGoogleName = 'googleName';
+  static const _kGoogleEmail = 'googleEmail';
+  static const _kGooglePhoto = 'googlePhoto';
 
   String? id;
   bool google = false;
   AWSCredentials? _creds;
+
+  /// What Google said about this person when they last signed in: their name, email and photo.
+  /// The profile form starts from these, so nobody types what Google already knows.
+  String googleName = '';
+  String googleEmail = '';
+  String googlePhoto = '';
 
   bool get exists => id != null;
 
@@ -32,6 +41,9 @@ class Identity {
     final p = await SharedPreferences.getInstance();
     id = p.getString(_kId);
     google = p.getBool(_kGoogle) ?? false;
+    googleName = p.getString(_kGoogleName) ?? '';
+    googleEmail = p.getString(_kGoogleEmail) ?? '';
+    googlePhoto = p.getString(_kGooglePhoto) ?? '';
     // Keep the short-lived credentials across reloads, so a page refresh doesn't need Google again.
     final saved = p.getString(_kCreds);
     if (id != null && saved != null) {
@@ -52,10 +64,16 @@ class Identity {
     if (id == null) {
       await p.remove(_kId);
       await p.remove(_kGoogle);
+      await p.remove(_kGoogleName);
+      await p.remove(_kGoogleEmail);
+      await p.remove(_kGooglePhoto);
       await p.remove(_kCreds);
     } else {
       await p.setString(_kId, id!);
       await p.setBool(_kGoogle, google);
+      await p.setString(_kGoogleName, googleName);
+      await p.setString(_kGoogleEmail, googleEmail);
+      await p.setString(_kGooglePhoto, googlePhoto);
       final c = _creds;
       if (c != null && c.expiration != null) {
         await p.setString(
@@ -74,6 +92,9 @@ class Identity {
   Future<void> clear() async {
     id = null;
     google = false;
+    googleName = '';
+    googleEmail = '';
+    googlePhoto = '';
     _creds = null;
     await _save();
   }
