@@ -115,7 +115,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
           children: [
             Text('Add an event', style: displayStyle(40)),
             const SizedBox(height: 8),
-            const Text('Add it once, and everyone who opens the link or scans the QR code joins the same room.',
+            Text('Add it once, and everyone who opens the link or scans the QR code joins the same room.',
                 style: TextStyle(color: C.muted, fontSize: 16, height: 1.45)),
             const SizedBox(height: 22),
             SurfaceCard(
@@ -150,7 +150,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
                 ]),
                 if (importError != null) ErrorNote(importError),
                 const SizedBox(height: 10),
-                const Text('Works with Luma, Meetup, Eventbrite and most event pages.',
+                Text('Works with Luma, Meetup, Eventbrite and most event pages.',
                     style: TextStyle(color: C.muted, fontSize: 13)),
               ]),
             ),
@@ -189,7 +189,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
               ),
             ]),
             if (picked?.lat != null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text('People will need to be at this place to check in.', style: TextStyle(color: C.muted, fontSize: 13)),
               ),
@@ -212,7 +212,7 @@ class _WhenButton extends StatelessWidget {
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(color: C.muted, fontSize: 13)),
+          Text(label, style: TextStyle(color: C.muted, fontSize: 13)),
           const SizedBox(height: 4),
           Text(value == null ? 'Set' : eventWhen(value, null), style: const TextStyle(fontSize: 15)),
         ]),

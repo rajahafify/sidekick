@@ -42,7 +42,7 @@ class _SignInSheetState extends State<_SignInSheet> {
               widget.reason ??
                   'Connecting shares your contact details when it’s mutual, so it needs a real account. '
                       'Your profile and check-ins stay as they are.',
-              style: const TextStyle(color: C.muted, fontSize: 16, height: 1.4),
+              style: TextStyle(color: C.muted, fontSize: 16, height: 1.4),
             ),
             const SizedBox(height: 22),
             GoogleButton(
@@ -58,7 +58,7 @@ class _SignInSheetState extends State<_SignInSheet> {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Not now', style: TextStyle(color: C.muted)),
+              child: Text('Not now', style: TextStyle(color: C.muted)),
             ),
             ErrorNote(error),
           ],

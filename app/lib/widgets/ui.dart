@@ -33,7 +33,7 @@ class Avatar extends StatelessWidget {
             width: size,
             height: size,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(color: C.soft, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: C.soft, shape: BoxShape.circle),
             child: Text(initial, style: displayStyle(size * 0.5)),
           );
     if (url.isEmpty) return Align(widthFactor: 1, heightFactor: 1, child: fallback);
@@ -92,7 +92,7 @@ class SurfaceCard extends StatelessWidget {
     color: C.surface,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(20),
-      side: const BorderSide(color: C.line),
+      side: BorderSide(color: C.line),
     ),
     clipBehavior: Clip.antiAlias,
     child: InkWell(
@@ -117,7 +117,7 @@ class ErrorNote extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: C.danger.withValues(alpha: 0.3)),
       ),
-      child: Text(text!, style: const TextStyle(color: C.danger, fontSize: 15)),
+      child: Text(text!, style: TextStyle(color: C.danger, fontSize: 15)),
     );
   }
 }
@@ -140,7 +140,7 @@ class EmptyState extends StatelessWidget {
         Text(
           text,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: C.muted, fontSize: 16, height: 1.4),
+          style: TextStyle(color: C.muted, fontSize: 16, height: 1.4),
         ),
         if (action != null) ...[const SizedBox(height: 20), action!],
       ],
@@ -151,7 +151,7 @@ class EmptyState extends StatelessWidget {
 class Loading extends StatelessWidget {
   const Loading({super.key});
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
     child: SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.5, color: C.go)),
   );
 }
@@ -160,7 +160,7 @@ class ButtonProgress extends StatelessWidget {
   const ButtonProgress({super.key});
   @override
   Widget build(BuildContext context) =>
-      const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.onInk));
+      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.onInk));
 }
 
 void haptic() => HapticFeedback.lightImpact();
@@ -207,7 +207,7 @@ class SectionLabel extends StatelessWidget {
         child: Row(children: [
           Expanded(
             child: Text(text.toUpperCase(),
-                style: const TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
+                style: TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
           ),
           ?trailing,
         ]),

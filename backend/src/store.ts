@@ -11,6 +11,7 @@
 //   QUOTA#<key>      QUOTA                 counts model calls; expires with ttl
 //   CACHE#<key>      CACHE                 cached model answers; expires with ttl
 //   REPORT#<id>      REPORT                a report about someone
+//   SETTINGS#app     SETTINGS              app-wide settings: the default theme (the admin sets it)
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DeleteCommand,

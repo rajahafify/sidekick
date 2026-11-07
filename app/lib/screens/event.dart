@@ -182,7 +182,7 @@ class _EventScreenState extends State<EventScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text("IT'S A MATCH", textAlign: TextAlign.center, style: eyebrow),
+              Text("IT'S A MATCH", textAlign: TextAlign.center, style: eyebrow),
               const SizedBox(height: 18),
               Center(
                 child: SizedBox(
@@ -198,7 +198,7 @@ class _EventScreenState extends State<EventScreen> {
               Text('You and ${firstName(p.displayName)} both want to connect',
                   textAlign: TextAlign.center, style: displayStyle(30)),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Your contacts are swapped, and your sidekick wrote an opener for the break.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: C.muted, fontSize: 15, height: 1.4),
@@ -214,7 +214,7 @@ class _EventScreenState extends State<EventScreen> {
               const SizedBox(height: 6),
               TextButton(
                 onPressed: () => Navigator.pop(c),
-                child: const Text('Keep scouting', style: TextStyle(color: C.muted)),
+                child: Text('Keep scouting', style: TextStyle(color: C.muted)),
               ),
             ],
           ),
@@ -236,7 +236,7 @@ class _EventScreenState extends State<EventScreen> {
             children: [
               Text('Bring the room in', style: displayStyle(32)),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Sidekick only works when people are checked in. Share the link or put the code on screen.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: C.muted),
@@ -280,13 +280,13 @@ class _EventScreenState extends State<EventScreen> {
               ListTile(
                 leading: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                 title: Text(visible ? 'Hide me from new people' : 'Show me in the room again'),
-                subtitle: Text(visible ? 'Matches you already have stay.' : '', style: const TextStyle(color: C.muted)),
+                subtitle: Text(visible ? 'Matches you already have stay.' : '', style: TextStyle(color: C.muted)),
                 onTap: () => Navigator.pop(c, 'visible'),
               ),
             if (r.checkedIn)
               ListTile(
-                leading: const Icon(Icons.logout, color: C.danger),
-                title: const Text('Leave this event', style: TextStyle(color: C.danger)),
+                leading: Icon(Icons.logout, color: C.danger),
+                title: Text('Leave this event', style: TextStyle(color: C.danger)),
                 onTap: () => Navigator.pop(c, 'leave'),
               ),
             const SizedBox(height: 8),
@@ -354,15 +354,15 @@ class _EventScreenState extends State<EventScreen> {
         // Opened from a link: there's nothing to go back to, so Back goes home.
         leading: TextButton.icon(
           onPressed: () => context.canPop() ? context.pop() : context.go('/'),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: C.ink),
-          label: const Text('Back', style: TextStyle(color: C.ink, fontSize: 17, fontWeight: FontWeight.w400)),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: C.ink),
+          label: Text('Back', style: TextStyle(color: C.ink, fontSize: 17, fontWeight: FontWeight.w400)),
         ),
         actions: [
           TextButton(
             onPressed: _shareSheet,
-            child: const Text('Share', style: TextStyle(color: C.go, fontSize: 17, fontWeight: FontWeight.w400)),
+            child: Text('Share', style: TextStyle(color: C.go, fontSize: 17, fontWeight: FontWeight.w400)),
           ),
-          if (r.checkedIn) IconButton(onPressed: _menu, icon: const Icon(Icons.more_horiz, color: C.muted)),
+          if (r.checkedIn) IconButton(onPressed: _menu, icon: Icon(Icons.more_horiz, color: C.muted)),
           const SizedBox(width: 8),
         ],
         bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
@@ -388,16 +388,16 @@ class _EventScreenState extends State<EventScreen> {
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(text: '${e.place} '),
-                    const WidgetSpan(
+                    WidgetSpan(
                       alignment: PlaceholderAlignment.middle,
                       child: Icon(Icons.north_east_rounded, size: 15, color: C.muted),
                     ),
                   ]),
-                  style: const TextStyle(color: C.muted, fontSize: 16),
+                  style: TextStyle(color: C.muted, fontSize: 16),
                 ),
               ),
             const SizedBox(height: 4),
-            Text('${r.count} checked in', style: const TextStyle(color: C.muted, fontSize: 14)),
+            Text('${r.count} checked in', style: TextStyle(color: C.muted, fontSize: 14)),
             const SizedBox(height: 22),
             if (!r.checkedIn) ..._joinSection(r, phase) else ..._roomSection(r),
             ErrorNote(error),
@@ -420,7 +420,7 @@ class _EventScreenState extends State<EventScreen> {
                 ? 'This event has ended.'
                 : 'Check in and your sidekick scouts everyone here, then shows you who is worth meeting. '
                       "Nobody sees who you pass on.${r.event.hasLocation ? " You need to be at the venue." : ''}",
-            style: const TextStyle(color: C.muted, fontSize: 15, height: 1.4),
+            style: TextStyle(color: C.muted, fontSize: 15, height: 1.4),
           ),
           const SizedBox(height: 18),
           FilledButton(
@@ -454,7 +454,7 @@ class _EventScreenState extends State<EventScreen> {
       SurfaceCard(
         padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
         child: Row(children: [
-          const Expanded(
+          Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Visible to others', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
               SizedBox(height: 2),
@@ -490,7 +490,7 @@ class _EventScreenState extends State<EventScreen> {
       const SizedBox(height: 18),
       if (tab == 0) ...[
         if (!me.visible)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
               "You're hidden from new people. Matches you already have stay.",
@@ -502,7 +502,7 @@ class _EventScreenState extends State<EventScreen> {
             padding: const EdgeInsets.only(bottom: 14),
             child: Text(
               "You're a guest: you can see your picks. Sign in to connect.",
-              style: const TextStyle(color: C.muted, fontSize: 14),
+              style: TextStyle(color: C.muted, fontSize: 14),
             ),
           ),
         if (r.people.isEmpty)
@@ -534,7 +534,7 @@ class _EventScreenState extends State<EventScreen> {
           Text(
             '${deck.length - 1} more lined up',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: C.muted, fontSize: 13),
+            style: TextStyle(color: C.muted, fontSize: 13),
           ),
         ],
         if (passed > 0)
@@ -569,12 +569,12 @@ class _EventScreenState extends State<EventScreen> {
                               p.headline,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: C.muted),
+                              style: TextStyle(color: C.muted),
                             ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: C.muted),
+                    Icon(Icons.chevron_right, color: C.muted),
                   ],
                 ),
               ),
@@ -664,7 +664,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
     final initials = p.displayName.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
     Widget label(String t) => Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Text(t, style: const TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
+          child: Text(t, style: TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
         );
 
     return GestureDetector(
@@ -718,7 +718,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                         )
                       else
                         DecoratedBox(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -747,7 +747,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                             Text(_fit.toUpperCase(), style: eyebrow.copyWith(fontSize: 11)),
                             if (widget.scouting) ...[
                               const SizedBox(width: 8),
-                              const SizedBox(
+                              SizedBox(
                                 width: 10,
                                 height: 10,
                                 child: CircularProgressIndicator(strokeWidth: 1.5, color: C.go),
@@ -775,7 +775,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                             Text(p.displayName, style: displayStyle(40)),
                             if (p.headline.isNotEmpty) ...[
                               const SizedBox(height: 8),
-                              Text(p.headline, style: const TextStyle(color: C.ink, fontSize: 16)),
+                              Text(p.headline, style: TextStyle(color: C.ink, fontSize: 16)),
                             ],
                           ],
                         ),
@@ -791,7 +791,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                     children: [
                       Container(
                         padding: const EdgeInsets.only(left: 16),
-                        decoration: const BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
+                        decoration: BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
                             const SidekickMark(size: 12, mood: BuddyMood.wink),
@@ -804,7 +804,7 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
                       ),
                       if (p.about.isNotEmpty) ...[
                         const SizedBox(height: 16),
-                        Text(p.about, style: const TextStyle(color: C.muted, fontSize: 15, height: 1.45)),
+                        Text(p.about, style: TextStyle(color: C.muted, fontSize: 15, height: 1.45)),
                       ],
                       if (p.lookingFor.isNotEmpty) ...[
                         const SizedBox(height: 18),

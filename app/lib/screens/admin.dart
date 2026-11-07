@@ -5,6 +5,7 @@ import '../data/api.dart';
 import '../data/identity.dart';
 import '../logic/geo_when.dart';
 import '../main.dart';
+import '../models.dart';
 import '../theme.dart';
 import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
@@ -65,6 +66,15 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Future<void> _setDefaultTheme(ThemeChoice choice) async {
+    try {
+      await SessionScope.of(context).setDefaultTheme(choice);
+      if (mounted) toast(context, 'Default theme saved.');
+    } on ApiError catch (e) {
+      if (mounted) toast(context, e.message);
+    }
+  }
+
   Future<void> _delete(String kind, String id, String what) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -80,7 +90,7 @@ class _AdminScreenState extends State<AdminScreen> {
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(c, true),
-            child: Text(kind == 'reports' ? 'Remove' : 'Delete', style: const TextStyle(color: C.danger)),
+            child: Text(kind == 'reports' ? 'Remove' : 'Delete', style: TextStyle(color: C.danger)),
           ),
         ],
       ),
@@ -132,11 +142,11 @@ class _AdminScreenState extends State<AdminScreen> {
                         tooltip: 'Refresh',
                         onPressed: loading ? null : _load,
                         icon: loading
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
-                            : const Icon(Icons.refresh, color: C.muted),
+                            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                            : Icon(Icons.refresh, color: C.muted),
                       ),
                     if (session.started && !session.guest)
-                      TextButton(onPressed: session.signOut, child: const Text('Sign out', style: TextStyle(color: C.muted))),
+                      TextButton(onPressed: session.signOut, child: Text('Sign out', style: TextStyle(color: C.muted))),
                   ]),
                 ),
                 Expanded(child: body),
@@ -169,7 +179,7 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('$n', style: displayStyle(34, color: i == 0 && n > 0 ? C.go : C.ink)),
                 const SizedBox(height: 2),
-                Text(label, style: const TextStyle(color: C.muted, fontSize: 13)),
+                Text(label, style: TextStyle(color: C.muted, fontSize: 13)),
               ]),
             ),
           ),
@@ -231,9 +241,26 @@ class _AdminScreenState extends State<AdminScreen> {
             const SizedBox(width: 10),
             stat(2, 'People', users.length),
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
+          const SectionLabel('Theme'),
+          SegmentedButton<ThemeChoice>(
+            showSelectedIcon: false,
+            segments: const [
+              ButtonSegment(value: ThemeChoice.system, label: Text('System')),
+              ButtonSegment(value: ThemeChoice.light, label: Text('Light')),
+              ButtonSegment(value: ThemeChoice.dark, label: Text('Dark')),
+            ],
+            selected: {SessionScope.of(context).defaultTheme},
+            onSelectionChanged: (choice) => _setDefaultTheme(choice.first),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The default for everyone who hasn’t picked their own, on the web and on the phone.',
+            style: TextStyle(color: C.muted, fontSize: 13, height: 1.35),
+          ),
+          const SizedBox(height: 22),
           TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search, color: C.muted), hintText: 'Search'),
+            decoration: InputDecoration(prefixIcon: Icon(Icons.search, color: C.muted), hintText: 'Search'),
             onChanged: (v) => setState(() => query = v),
           ),
           const SizedBox(height: 16),
@@ -267,10 +294,10 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 6),
                 Text(
                   '${people.length} checked in · ${d['swipes']} swipes · ${d['matches']} matches',
-                  style: const TextStyle(color: C.muted),
+                  style: TextStyle(color: C.muted),
                 ),
                 const SizedBox(height: 4),
-                SelectableText('id: $id', style: const TextStyle(color: C.muted, fontSize: 12)),
+                SelectableText('id: $id', style: TextStyle(color: C.muted, fontSize: 12)),
                 const SizedBox(height: 18),
                 const SectionLabel('Checked in'),
                 if (people.isEmpty) const _Empty('Nobody checked in.'),
@@ -342,7 +369,7 @@ class _Row extends StatelessWidget {
       Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
       if (subtitle.isNotEmpty) ...[
         const SizedBox(height: 3),
-        Text(subtitle, style: const TextStyle(color: C.muted, fontSize: 14, height: 1.35)),
+        Text(subtitle, style: TextStyle(color: C.muted, fontSize: 14, height: 1.35)),
       ],
     ]);
     final buttons = [
@@ -357,13 +384,13 @@ class _Row extends StatelessWidget {
           // On a phone the buttons go under the text, so the text keeps the width.
           builder: (context, c) => c.maxWidth < 480
               ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [Expanded(child: text), if (onTap != null) const Icon(Icons.chevron_right, color: C.muted)]),
+                  Row(children: [Expanded(child: text), if (onTap != null) Icon(Icons.chevron_right, color: C.muted)]),
                   if (buttons.isNotEmpty) Transform.translate(offset: const Offset(-12, 0), child: Wrap(children: buttons)),
                 ])
               : Row(children: [
                   Expanded(child: text),
                   ...buttons,
-                  if (onTap != null) const Icon(Icons.chevron_right, color: C.muted),
+                  if (onTap != null) Icon(Icons.chevron_right, color: C.muted),
                 ]),
         ),
       ),
@@ -376,7 +403,7 @@ class _Empty extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) =>
-      Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Text(text, style: const TextStyle(color: C.muted)));
+      Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Text(text, style: TextStyle(color: C.muted)));
 }
 
 class _SignIn extends StatelessWidget {
@@ -392,7 +419,7 @@ class _SignIn extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Admin', style: displayStyle(44)),
               const SizedBox(height: 8),
-              const Text('Sign in with the Google account that runs Sidekick.',
+              Text('Sign in with the Google account that runs Sidekick.',
                   style: TextStyle(color: C.muted, fontSize: 16, height: 1.4)),
               const SizedBox(height: 24),
               GoogleButton(onResult: (e) {
@@ -419,7 +446,7 @@ class _NotAdmin extends StatelessWidget {
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Not an admin yet', style: displayStyle(38)),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'To make this account an admin, add its id to the GitHub variable ADMIN_IDENTITY_IDS '
                 '(Settings → Secrets and variables → Actions → Variables), then re-run the Deploy workflow.',
                 style: TextStyle(color: C.muted, fontSize: 15, height: 1.45),
@@ -434,14 +461,14 @@ class _NotAdmin extends StatelessWidget {
                       Clipboard.setData(ClipboardData(text: id));
                       toast(context, 'Copied.');
                     },
-                    icon: const Icon(Icons.copy, color: C.muted, size: 20),
+                    icon: Icon(Icons.copy, color: C.muted, size: 20),
                   ),
                 ]),
               ),
               const SizedBox(height: 18),
               FilledButton(onPressed: onRetry, child: const Text('I’ve added it, check again')),
               const SizedBox(height: 8),
-              TextButton(onPressed: onSignOut, child: const Text('Use another account', style: TextStyle(color: C.muted))),
+              TextButton(onPressed: onSignOut, child: Text('Use another account', style: TextStyle(color: C.muted))),
             ]),
           ),
         ),

@@ -120,7 +120,7 @@ class _CheckInViewState extends State<CheckInView> {
             ],
             Text('Check in to a place', style: displayStyle(40)),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'At a coworking space, a café or a venue with no event page? Check in, and your sidekick scouts '
               'everyone else checked in there today.',
               style: TextStyle(color: C.muted, fontSize: 16, height: 1.4),
@@ -129,12 +129,12 @@ class _CheckInViewState extends State<CheckInView> {
             OutlinedButton.icon(
               onPressed: locating ? null : _findNearby,
               icon: locating
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
-                  : const Icon(Icons.my_location, color: C.go),
+                  ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                  : Icon(Icons.my_location, color: C.go),
               label: Text(locating ? 'Finding places near you…' : 'Use my location'),
             ),
             if (nearby != null && nearby!.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text('No places found nearby. Type the name below.', style: TextStyle(color: C.muted)),
               ),
@@ -152,7 +152,7 @@ class _CheckInViewState extends State<CheckInView> {
                             formatDistance(distanceM(fix!, LatLng(p.lat!, p.lng!))),
                           p.address,
                         ].where((s) => s.isNotEmpty).join(' · '),
-                        style: const TextStyle(color: C.muted),
+                        style: TextStyle(color: C.muted),
                       ),
                       onTap: () => _pick(p),
                     ),
@@ -176,7 +176,7 @@ class _CheckInViewState extends State<CheckInView> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'When we know where the place is, you need to be there to check in. Your location is only used for that check.',
               style: TextStyle(color: C.muted, fontSize: 13),
             ),
@@ -185,8 +185,8 @@ class _CheckInViewState extends State<CheckInView> {
               child: TextButton(
                 onPressed: () => context.push('/new'),
                 child: Text.rich(TextSpan(children: [
-                  const TextSpan(text: 'Going to an event instead? ', style: TextStyle(color: C.muted)),
-                  TextSpan(text: 'Add the event', style: const TextStyle(color: C.go, fontWeight: FontWeight.w500)),
+                  TextSpan(text: 'Going to an event instead? ', style: TextStyle(color: C.muted)),
+                  TextSpan(text: 'Add the event', style: TextStyle(color: C.go, fontWeight: FontWeight.w500)),
                 ])),
               ),
             ),

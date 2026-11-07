@@ -85,6 +85,9 @@ const profileSchema = z.object({
   about: str(200).default(''),
   contact: contactSchema.default({ linkedin: '', email: '', phone: '' }),
 });
+// The look for people who haven't picked their own (the admin sets it).
+const themes = ['system', 'light', 'dark'] as const;
+const settingsSchema = z.object({ defaultTheme: z.enum(themes) });
 const iso = z
   .string()
   .datetime({ offset: true })
@@ -247,8 +250,9 @@ export class App {
         guest: me.guest,
         admin: this.isAdmin(me),
         profile: profileOut(await this.store.get(`USER#${me.id}`, 'PROFILE')),
+        defaultTheme: await this.defaultTheme(),
       };
-    if (parts[0] === 'admin') return this.admin(me, method, parts.slice(1));
+    if (parts[0] === 'admin') return this.admin(me, method, parts.slice(1), body);
     if (is('PUT', 'me')) return this.saveProfile(me, body);
     if (is('DELETE', 'me')) return this.deleteAccount(me);
     if (is('GET', 'events')) return this.listEvents(me);
@@ -325,12 +329,24 @@ export class App {
     return !me.guest && (this.d.adminIds ?? []).includes(me.id);
   }
 
-  private async admin(me: Identity, method: string, p: string[]): Promise<unknown> {
+  /** The theme for people who haven't picked their own. */
+  private async defaultTheme(): Promise<(typeof themes)[number]> {
+    const s = await this.store.get('SETTINGS#app', 'SETTINGS');
+    return (themes as readonly string[]).includes(s?.defaultTheme) ? s!.defaultTheme : 'dark';
+  }
+
+  private async admin(me: Identity, method: string, p: string[], body: unknown): Promise<unknown> {
     if (!this.isAdmin(me)) fail(403, 'This account is not an admin.');
     const is = (m: string, ...want: string[]) =>
       method === m && p.length === want.length && want.every((x, i) => x === '*' || x === p[i]);
     const id = p[1] ?? '';
     if (p.length > 1 && !/^[\w:.-]{1,160}$/.test(id)) fail(400, 'Invalid id.');
+
+    if (is('PUT', 'settings')) {
+      const s = parse(settingsSchema, body);
+      await this.store.put({ pk: 'SETTINGS#app', sk: 'SETTINGS', defaultTheme: s.defaultTheme, updatedAt: this.nowIso() });
+      return { defaultTheme: s.defaultTheme };
+    }
 
     if (is('GET', 'overview')) {
       const [profiles, events, reports] = await Promise.all([

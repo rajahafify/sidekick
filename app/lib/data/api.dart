@@ -87,10 +87,15 @@ class Api {
 
   // ---------- Profile ----------
 
-  Future<({bool guest, Profile? profile})> me() async {
+  /// Who I am, my profile, and the theme the admin set for people who haven't picked one.
+  Future<({bool guest, Profile? profile, ThemeChoice defaultTheme})> me() async {
     final j = await _send('GET', '/me');
     final p = j['profile'];
-    return (guest: j['guest'] == true, profile: p is Map ? Profile.fromMap(p.cast<String, dynamic>()) : null);
+    return (
+      guest: j['guest'] == true,
+      profile: p is Map ? Profile.fromMap(p.cast<String, dynamic>()) : null,
+      defaultTheme: ThemeChoice.parse(j['defaultTheme']),
+    );
   }
 
   Future<Profile> saveProfile(Profile p) async {
@@ -109,6 +114,10 @@ class Api {
 
   /// kind is events, users or reports.
   Future<void> adminDelete(String kind, String id) => _send('DELETE', '/admin/$kind/${Uri.encodeComponent(id)}');
+
+  /// The theme for everyone who hasn't picked their own, on the web and the phone.
+  Future<void> adminSetDefaultTheme(ThemeChoice theme) =>
+      _send('PUT', '/admin/settings', {'defaultTheme': theme.name});
 
   // ---------- Sidekick status ----------
 

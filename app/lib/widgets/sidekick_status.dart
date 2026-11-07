@@ -100,7 +100,7 @@ class _SidekickStatusCardState extends State<SidekickStatusCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Expanded(child: Text('YOUR SIDEKICK', style: eyebrow)),
+            Expanded(child: Text('YOUR SIDEKICK', style: eyebrow)),
             Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -109,13 +109,13 @@ class _SidekickStatusCardState extends State<SidekickStatusCard> {
           Text(detail, style: const TextStyle(fontSize: 15, height: 1.4)),
           if (model != null) ...[
             const SizedBox(height: 4),
-            Text(model!, style: const TextStyle(color: C.muted, fontSize: 13)),
+            Text(model!, style: TextStyle(color: C.muted, fontSize: 13)),
           ],
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: checking ? null : _check,
             child: checking
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
                 : const Text('Check now'),
           ),
         ],

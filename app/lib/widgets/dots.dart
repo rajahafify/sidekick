@@ -10,17 +10,19 @@ typedef DotField = double Function(Offset p, Size s);
 /// Draws any brightness field as a halftone: a staggered grid of dots whose size follows the
 /// brightness. This is Sidekick's whole image style.
 class Dots extends StatelessWidget {
-  const Dots(this.field, {super.key, this.step = 8, this.color = C.ink, this.fade});
+  const Dots(this.field, {super.key, this.step = 8, this.color, this.fade});
   final DotField field;
   final double step;
-  final Color color;
+
+  /// Ink unless told otherwise.
+  final Color? color;
 
   /// Fades the dots out between these fractions of the height (e.g. (0.5, 0.8)), so text can sit on top.
   final (double, double)? fade;
 
   @override
   Widget build(BuildContext context) => RepaintBoundary(
-    child: CustomPaint(painter: _DotsPainter(field, step, color, fade), size: Size.infinite),
+    child: CustomPaint(painter: _DotsPainter(field, step, color ?? C.ink, fade), size: Size.infinite),
   );
 }
 
@@ -113,19 +115,19 @@ class SidekickMark extends StatelessWidget {
   const SidekickMark({
     super.key,
     this.size = 20,
-    this.color = C.ink,
-    this.features = C.paper,
-    this.cheeks = C.go,
+    this.color,
+    this.features,
+    this.cheeks,
     this.mood = BuddyMood.normal,
   });
   final double size;
 
-  /// The face.
-  final Color color;
+  /// The face. Ink unless told otherwise.
+  final Color? color;
 
-  /// Eyes and mouth.
-  final Color features;
-  final Color cheeks;
+  /// Eyes and mouth. Paper unless told otherwise.
+  final Color? features;
+  final Color? cheeks;
   final BuddyMood mood;
 
   @override
@@ -133,7 +135,7 @@ class SidekickMark extends StatelessWidget {
     width: size * markAspect,
     height: size,
     child: CustomPaint(
-      painter: BuddyPainter(color: color, features: features, cheeks: cheeks, mood: mood),
+      painter: BuddyPainter(color: color ?? C.ink, features: features ?? C.paper, cheeks: cheeks ?? C.go, mood: mood),
     ),
   );
 }

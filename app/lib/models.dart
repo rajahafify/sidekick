@@ -329,3 +329,18 @@ class PlaceDetails {
         lng: _num(j['lng']),
       );
 }
+
+/// How the app looks: follow the phone or browser, or always light or always dark. Each person can
+/// pick their own; otherwise the admin's default applies.
+enum ThemeChoice {
+  system,
+  light,
+  dark;
+
+  static ThemeChoice parse(Object? v, {ThemeChoice fallback = ThemeChoice.dark}) {
+    for (final c in values) {
+      if (c.name == v) return c;
+    }
+    return fallback;
+  }
+}
