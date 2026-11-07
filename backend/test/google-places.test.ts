@@ -89,6 +89,13 @@ describe('match', () => {
     expect(await googlePlaces(withKey, doFetch).match('Common Ground', 'KL', near)).toBeNull();
   });
 
+  it('says whether there is a key, without calling Google', async () => {
+    const { doFetch, asked } = fakeFetch(() => ({ body: {} }));
+    expect(await googlePlaces(withKey, doFetch).hasKey()).toBe(true);
+    expect(await googlePlaces(async () => null, doFetch).hasKey()).toBe(false);
+    expect(asked).toHaveLength(0);
+  });
+
   it('makes no call at all without a key', async () => {
     const { doFetch, asked } = fakeFetch(() => ({ body: {} }));
     expect(await googlePlaces(async () => null, doFetch).match('Common Ground', 'KL', near)).toBeNull();

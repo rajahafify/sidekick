@@ -60,6 +60,8 @@ export interface GooglePlaces {
   details(id: string): Promise<GooglePlace | null>;
   /** Up to `max` photos, fresh from Google. */
   photos(id: string, max: number): Promise<GooglePhoto[]>;
+  /** Whether a key is set. The app checks it before spending a day's Google call, so a missing key costs nothing. */
+  hasKey(): Promise<boolean>;
 }
 
 /** Google's field mask decides the price tier, so each call asks only for what the page shows. */
@@ -140,6 +142,10 @@ export function googlePlaces(apiKey: () => Promise<string | null>, doFetch: type
   }
 
   return {
+    async hasKey() {
+      return !!(await apiKey());
+    },
+
     async match(name, address, near) {
       const key = await apiKey();
       if (!key) return null;

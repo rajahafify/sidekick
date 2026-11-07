@@ -774,6 +774,8 @@ export class App {
     const g = this.d.googlePlaces;
     // A nameless place can't be matched, and a "no listing" answer for it would be remembered for no reason.
     if (!g || !place.name) return null;
+    // With no key there's nothing to ask Google, so the day's billed calls aren't spent on it.
+    if (!(await g.hasKey())) return null;
     const billed = () => this.takeQuota(`gbilled:${today}`, GOOGLE_BILLED_PER_DAY, DAY_S);
 
     // Which listing is this place? Google lets us keep place IDs, so it's remembered for a year.

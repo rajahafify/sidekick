@@ -71,6 +71,7 @@ function fakeGoogle(over: Partial<GooglePlaces> = {}) {
       calls.photos++;
       return [photo];
     },
+    hasKey: async () => true,
     ...over,
   };
   return { g, calls };
@@ -203,6 +204,22 @@ describe('place pages', () => {
       },
       room: null,
     });
+  });
+
+  it('spends no billed call while there is no key, so a key added later that day still gets the whole cap', async () => {
+    let keyed = false;
+    const g = fakeGoogle({ hasKey: async () => keyed });
+    const s = setup({ googlePlaces: g.g });
+    // Four people with 60 views each: 240 views, more than the day's 200 billed calls.
+    for (const n of ['p1', 'p2', 'p3', 'p4']) {
+      for (let i = 0; i < 60; i++) expect((await s.call(who(n), 'POST', '/places/page', { placeId: place.placeId })).status).toBe(200);
+    }
+    expect(g.calls).toEqual({ match: 0, details: 0, photos: 0 });
+
+    keyed = true;
+    const r = await s.call(alice, 'POST', '/places/page', { placeId: place.placeId });
+    expect(r.body.place.google).toBe(true);
+    expect(g.calls.match).toBe(1);
   });
 
   it('rejects a bad day, a missing place, and a place it cannot find', async () => {
