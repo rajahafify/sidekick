@@ -100,6 +100,16 @@ class Api {
 
   Future<void> deleteAccount() => _send('DELETE', '/me');
 
+  // ---------- Admin (only works for accounts listed in ADMIN_IDENTITY_IDS) ----------
+
+  /// Everyone, every event (newest first) and open reports.
+  Future<Map<String, dynamic>> adminOverview() => _send('GET', '/admin/overview');
+
+  Future<Map<String, dynamic>> adminEvent(String id) => _send('GET', '/admin/events/${Uri.encodeComponent(id)}');
+
+  /// kind is events, users or reports.
+  Future<void> adminDelete(String kind, String id) => _send('DELETE', '/admin/$kind/${Uri.encodeComponent(id)}');
+
   // ---------- Sidekick status ----------
 
   /// Which model the sidekick runs on, and how its last real call went.

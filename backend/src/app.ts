@@ -36,6 +36,8 @@ export type Deps = {
   places: Places | null;
   fetch: typeof fetch;
   now: () => number;
+  /** Cognito identity ids that may use the admin endpoints (signed in with Google only). */
+  adminIds?: string[];
 };
 export type Req = { method: string; path: string; body: unknown; identity: Identity };
 export type Res = { status: number; body: unknown };
@@ -239,7 +241,14 @@ export class App {
     const is = (m: string, ...p: string[]) =>
       method === m && parts.length === p.length && p.every((x, i) => x === '*' || x === parts[i]);
 
-    if (is('GET', 'me')) return { guest: me.guest, profile: profileOut(await this.store.get(`USER#${me.id}`, 'PROFILE')) };
+    if (is('GET', 'me'))
+      return {
+        id: me.id,
+        guest: me.guest,
+        admin: this.isAdmin(me),
+        profile: profileOut(await this.store.get(`USER#${me.id}`, 'PROFILE')),
+      };
+    if (parts[0] === 'admin') return this.admin(me, method, parts.slice(1));
     if (is('PUT', 'me')) return this.saveProfile(me, body);
     if (is('DELETE', 'me')) return this.deleteAccount(me);
     if (is('GET', 'events')) return this.listEvents(me);
@@ -308,6 +317,80 @@ export class App {
       contact: p.contact,
       guest: me.guest,
     };
+  }
+
+  // ---------- Admin ----------
+
+  private isAdmin(me: Identity) {
+    return !me.guest && (this.d.adminIds ?? []).includes(me.id);
+  }
+
+  private async admin(me: Identity, method: string, p: string[]): Promise<unknown> {
+    if (!this.isAdmin(me)) fail(403, 'This account is not an admin.');
+    const is = (m: string, ...want: string[]) =>
+      method === m && p.length === want.length && want.every((x, i) => x === '*' || x === p[i]);
+    const id = p[1] ?? '';
+    if (p.length > 1 && !/^[\w:.-]{1,160}$/.test(id)) fail(400, 'Invalid id.');
+
+    if (is('GET', 'overview')) {
+      const [profiles, events, reports] = await Promise.all([
+        this.store.scanBySk('PROFILE'),
+        this.store.recent('EVENTS', 500),
+        this.store.scanBySk('REPORT'),
+      ]);
+      const names = new Map(profiles.map((u) => [u.pk.slice('USER#'.length), String(u.displayName ?? '')]));
+      return {
+        users: profiles
+          .map((u) => ({
+            id: u.pk.slice('USER#'.length),
+            displayName: u.displayName ?? '',
+            headline: u.headline ?? '',
+            guest: u.guest === true,
+            contact: u.contact ?? null,
+            updatedAt: u.updatedAt ?? null,
+          }))
+          .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))),
+        events: events.map((e) => ({ ...eventOut(e), kind: e.kind ?? 'event', createdAt: e.createdAt ?? null })),
+        reports: reports
+          .map((r) => ({
+            id: r.pk.slice('REPORT#'.length),
+            reporter: r.reporter,
+            reporterName: names.get(r.reporter) ?? '',
+            reported: r.reported,
+            reportedName: names.get(r.reported) ?? '',
+            eventId: r.eventId ?? null,
+            reason: r.reason ?? '',
+            at: r.at ?? null,
+          }))
+          .sort((a, b) => String(b.at).localeCompare(String(a.at))),
+      };
+    }
+    if (is('GET', 'events', '*')) {
+      const meta = await this.store.get(`EVENT#${id}`, 'META');
+      if (!meta) fail(404, 'Event not found.');
+      const items = await this.store.query(`EVENT#${id}`, '');
+      return {
+        event: eventOut(meta!),
+        attendees: items
+          .filter((i) => i.sk.startsWith('ATT#'))
+          .map((a) => ({ id: a.uid, displayName: a.displayName ?? '', headline: a.headline ?? '', guest: a.guest === true, visible: a.visible !== false })),
+        swipes: items.filter((i) => i.sk.startsWith('SWIPE#')).length,
+        matches: items.filter((i) => i.sk.startsWith('MATCH#')).length,
+      };
+    }
+    if (is('DELETE', 'events', '*')) {
+      for (const i of await this.store.query(`EVENT#${id}`, '')) {
+        if (i.sk.startsWith('ATT#')) await this.store.delete(`USER#${i.sk.slice('ATT#'.length)}`, `EVENT#${id}`);
+        await this.store.delete(i.pk, i.sk);
+      }
+      return { ok: true };
+    }
+    if (is('DELETE', 'users', '*')) return this.deleteAccount({ id, guest: false });
+    if (is('DELETE', 'reports', '*')) {
+      await this.store.delete(`REPORT#${id}`, 'REPORT');
+      return { ok: true };
+    }
+    return fail(404, 'Not found.');
   }
 
   private async deleteAccount(me: Identity) {

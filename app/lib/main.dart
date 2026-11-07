@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'config.dart';
 import 'data/session.dart';
+import 'screens/admin.dart';
 import 'screens/check_in.dart';
 import 'screens/event.dart';
 import 'screens/home.dart';
@@ -72,6 +73,13 @@ GoRouter _router(Session session) => GoRouter(
       redirect: (context, state) {
         final loc = state.matchedLocation;
         if (!session.ready) return loc == '/loading' ? null : '/loading?next=${Uri.encodeComponent(state.uri.toString())}';
+        // The admin site shows only the admin screen, which handles signing in itself.
+        if (Config.adminHost) return loc == '/admin' ? null : '/admin';
+        final going = loc == '/loading' ? state.uri.queryParameters['next'] : loc;
+        if (going == '/admin') {
+          if (!session.started) return loc == '/welcome' ? null : '/welcome?next=/admin';
+          return loc == '/admin' ? null : '/admin';
+        }
         final next = state.uri.queryParameters['next'];
         if (session.startError != null) return loc == '/offline' ? null : '/offline';
         if (loc == '/offline') return next ?? '/';
@@ -89,6 +97,7 @@ GoRouter _router(Session session) => GoRouter(
       },
       routes: [
         GoRoute(path: '/loading', builder: (_, _) => const Scaffold(body: Loading())),
+        GoRoute(path: '/admin', builder: (_, _) => const AdminScreen()),
         GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
         GoRoute(path: '/offline', builder: (_, _) => const OfflineScreen()),
         GoRoute(path: '/profile', builder: (_, s) => ProfileScreen(next: s.uri.queryParameters['next'])),

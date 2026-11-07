@@ -18,6 +18,7 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  ScanCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 
@@ -35,6 +36,8 @@ export interface Store {
   recent(gsi1pk: string, limit: number): Promise<Item[]>;
   /** Adds 1 to a counter and returns the new value. */
   increment(pk: string, sk: string, ttl: number): Promise<number>;
+  /** Every item with this sk, across the whole table. Admin only: it reads the table. */
+  scanBySk(sk: string, limit?: number): Promise<Item[]>;
 }
 
 export class DynamoStore implements Store {
@@ -117,6 +120,24 @@ export class DynamoStore implements Store {
     );
     return Number(r.Attributes?.n ?? 1);
   }
+
+  async scanBySk(sk: string, limit = 2000) {
+    const out: Item[] = [];
+    let start: Record<string, any> | undefined;
+    do {
+      const r = await this.db.send(
+        new ScanCommand({
+          TableName: this.table,
+          FilterExpression: 'sk = :sk',
+          ExpressionAttributeValues: { ':sk': sk },
+          ExclusiveStartKey: start,
+        }),
+      );
+      out.push(...((r.Items as Item[]) ?? []));
+      start = r.LastEvaluatedKey;
+    } while (start && out.length < limit);
+    return out.slice(0, limit);
+  }
 }
 
 /** In-memory Store for tests and local runs. */
@@ -158,5 +179,8 @@ export class MemoryStore implements Store {
     const n = Number(cur?.n ?? 0) + 1;
     this.items.set(this.k(pk, sk), { ...(cur ?? { pk, sk }), n });
     return n;
+  }
+  async scanBySk(sk: string, limit = 2000) {
+    return [...this.items.values()].filter((i) => i.sk === sk).slice(0, limit).map(this.copy);
   }
 }

@@ -30,6 +30,8 @@ export type SidekickProps = StackProps & {
   llmProvider: 'openrouter' | 'bedrock';
   /** OpenRouter model id, or Bedrock model / inference profile id. */
   modelId: string;
+  /** Comma-separated Cognito identity ids allowed to use the admin screen. */
+  adminIds?: string;
   /** SSM SecureString holding the OpenRouter API key. */
   openRouterKeyParam: string;
   /** Region to call Bedrock in (the model must be enabled there). */
@@ -105,6 +107,7 @@ export class SidekickStack extends Stack {
         OPENROUTER_KEY_PARAM: props.openRouterKeyParam,
         BEDROCK_REGION: props.bedrockRegion,
         PLACES_COUNTRIES: props.placesCountries,
+        ADMIN_IDS: props.adminIds ?? '',
       },
       bundling: { minify: true, sourceMap: true, target: 'node22' },
     });
@@ -296,6 +299,17 @@ export class SidekickStack extends Stack {
           actions: ['sts:AssumeRole'],
           resources: [`arn:aws:iam::${this.account}:role/cdk-*`],
         }),
+      );
+      // Deploy stores the model key, and the Android workflow keeps its signing key, in SSM, and
+      // reads the stack outputs.
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['ssm:GetParameter', 'ssm:PutParameter'],
+          resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/sidekick/*`],
+        }),
+      );
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({ actions: ['cloudformation:DescribeStacks'], resources: [this.stackId] }),
       );
       new CfnOutput(this, 'DeployRoleArn', { value: deployRole.roleArn });
     }

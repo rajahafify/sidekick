@@ -28,15 +28,20 @@ PY
 flutter pub get
 flutter build web --release --no-web-resources-cdn --dart-define-from-file=env.json
 
-# Android app links. Pages serves index.html for app routes like /e/<id> on its own (no 404.html).
+# Android app links. The Android workflow commits web/.well-known/assetlinks.json (copied into the
+# build); ANDROID_CERT_SHA256, if set, overrides it. Pages serves index.html for app routes like
+# /e/<id> on its own (no 404.html).
 mkdir -p build/web/.well-known
 python3 - <<'PY'
 import json, os
 fps = [s.strip() for s in os.environ.get('ANDROID_CERT_SHA256', '').split(',') if s.strip()]
-links = [{'relation': ['delegate_permission/common.handle_all_urls'],
-          'target': {'namespace': 'android_app', 'package_name': 'com.artifisi.sidekick',
-                     'sha256_cert_fingerprints': fps}}] if fps else []
-json.dump(links, open('build/web/.well-known/assetlinks.json', 'w'))
+path = 'build/web/.well-known/assetlinks.json'
+if fps:
+    json.dump([{'relation': ['delegate_permission/common.handle_all_urls'],
+                'target': {'namespace': 'android_app', 'package_name': 'com.artifisi.sidekick',
+                           'sha256_cert_fingerprints': fps}}], open(path, 'w'))
+elif not os.path.exists(path):
+    json.dump([], open(path, 'w'))
 PY
 # Entry files must always be fresh; hashed assets can be cached.
 cat > build/web/_headers <<'H'

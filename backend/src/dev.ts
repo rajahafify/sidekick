@@ -9,7 +9,9 @@ import { App } from './app';
 import { MemoryStore } from './store';
 
 const store = new MemoryStore();
-const app = new App({ store, model: null, places: null, fetch, now: () => Date.now() });
+// DEV_ADMINS=dev:me makes that dev identity an admin.
+const adminIds = (process.env.DEV_ADMINS ?? 'dev:me').split(',').filter(Boolean);
+const app = new App({ store, model: null, places: null, fetch, now: () => Date.now(), adminIds });
 const port = Number(process.env.PORT ?? 8787);
 
 async function seed() {

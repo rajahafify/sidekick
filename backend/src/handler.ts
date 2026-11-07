@@ -33,6 +33,7 @@ const app = new App({
   places: env.PLACES === 'off' ? null : locationPlaces(env.AWS_REGION!, (env.PLACES_COUNTRIES ?? '').split(',').filter(Boolean)),
   fetch,
   now: () => Date.now(),
+  adminIds: (env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
 });
 
 /** Who's calling. `amr` lists "unauthenticated" for guests, "authenticated" once they've signed in. */
