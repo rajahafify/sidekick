@@ -53,13 +53,22 @@ export function openRouterModel(
           ],
           max_tokens: opts.maxTokens,
           temperature: opts.temperature,
+          // The free router can pick a thinking model, whose reasoning would eat the token budget
+          // and leave no answer. Keep thinking short and out of the reply.
+          reasoning: { effort: 'low', exclude: true },
         }),
         signal: AbortSignal.timeout(20_000),
       });
       if (!r.ok) return { text: null, error: `OpenRouter ${r.status}: ${(await r.text()).slice(0, 300)}` };
       const body: any = await r.json();
-      const text = String(body?.choices?.[0]?.message?.content ?? '').trim();
-      return { text: text || null, error: text ? undefined : 'Empty reply' };
+      const choice = body?.choices?.[0];
+      const text = String(choice?.message?.content ?? '').trim();
+      if (text) return { text };
+      // Say which model answered and why it stopped, so the status check can explain an empty reply.
+      const why = [body?.model, choice?.finish_reason && `finish_reason ${choice.finish_reason}`, body?.error?.message]
+        .filter(Boolean)
+        .join(', ');
+      return { text: null, error: why ? `Empty reply (${why})` : 'Empty reply' };
     } catch (e: any) {
       return { text: null, error: `OpenRouter ${e?.name ?? 'error'}: ${String(e?.message ?? e).slice(0, 300)}` };
     }
