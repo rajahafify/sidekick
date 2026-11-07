@@ -1,0 +1,43 @@
+name: Full suite
+
+# Runs the whole pipeline from Actions → Full suite → Run workflow: CI, then Deploy (the AWS backend), then the
+# Android app. Each part is the existing workflow, called as-is, so a change to one of them applies here too.
+# It stops at the first failure: Deploy waits for CI, and the Android app waits for Deploy because it reads the
+# deployed stack's outputs. The Cloudflare Pages website builds on push, so it isn't part of this run.
+#
+# Like Deploy, a run from another branch deploys that branch's backend, so run it from main unless you mean to.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run at a time per branch. A run in progress is never cancelled, so a deploy can't be cut off halfway.
+concurrency:
+  group: full-suite-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy
+    needs: ci
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+
+  android:
+    name: Android app
+    needs: deploy
+    permissions:
+      id-token: write
+      contents: write
+    uses: ./.github/workflows/android.yml
+    secrets: inherit

@@ -2,6 +2,7 @@ name: Deploy
 
 # Deploys the AWS backend (API, data, sign-in, the sidekick). The website is built and hosted by
 # Cloudflare Pages straight from this repo (app/cloudflare-build.sh, README step 6). Runs on every push to main, or by hand from the Actions tab (Run workflow).
+# Full suite (full-suite.yml) runs it after CI passes.
 #
 # Repo settings (Settings → Secrets and variables → Actions):
 #   secrets   AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY  an IAM admin access key, for the first run
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths: ['backend/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   id-token: write

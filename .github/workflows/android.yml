@@ -14,8 +14,10 @@ name: Android app
 #
 # Uses the same AWS secrets as Deploy (AWS_DEPLOY_ROLE_ARN, or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)
 # and the GOOGLE_WEB_CLIENT_ID variable. An ANDROID_KEYSTORE_BASE64 secret, if you add one, wins.
+# Full suite (full-suite.yml) runs this after Deploy, since it reads the deployed stack's outputs.
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     tags: ['v*']
 
