@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import '../models.dart';
+import 'identity.dart';
 
 class ApiError implements Exception {
   ApiError(this.message, {this.status = 0, this.data = const {}});
@@ -67,6 +68,8 @@ class Api {
     } on ApiError {
       rethrow;
     } catch (e) {
+      // A sign-in that Google can't renew is not a connection problem: the person signs in again.
+      if (e is IdentityError && e.code == 'NeedsGoogle') throw ApiError(e.message);
       throw ApiError("Couldn't reach Sidekick. Check your connection and try again.");
     }
     Map<String, dynamic> data = const {};

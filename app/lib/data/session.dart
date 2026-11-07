@@ -46,8 +46,10 @@ class Session extends ChangeNotifier implements Credentials {
     }
     if (started) {
       try {
-        // Saved credentials cover a reload; when they've expired, credentials() renews them
-        // (for Google users, silently through Google if it can).
+        // Saved credentials cover a reload; when they've expired, renew them here (for Google users,
+        // silently through Google if it can). This happens before the request, not inside it: when
+        // Google can't renew them, the person signs in again. That isn't the same as being offline.
+        if (!Config.useDevApi) await credentials();
         await reloadProfile();
       } on IdentityError catch (e) {
         if (e.code == 'NeedsGoogle' || e.code == 'ResourceNotFoundException' || e.code == 'NotAuthorizedException') {
@@ -56,7 +58,7 @@ class Session extends ChangeNotifier implements Credentials {
           startError = e.message;
         }
       } catch (e) {
-        startError = '$e';
+        startError = e is ApiError ? e.message : "Couldn't reach Sidekick. Check your connection and try again.";
       }
     }
     ready = true;
