@@ -2,9 +2,11 @@ name: CI
 
 # Tests the backend and app. (The signed Android app is built by the Android app workflow.) While we're prototyping it only runs on
 # demand (Actions → CI → Run workflow) or when a version tag like v0.3.0 is pushed. It never blocks
-# a deploy: the backend Deploy workflow and the Cloudflare Pages build don't wait for it.
+# a deploy on its own: the backend Deploy workflow and the Cloudflare Pages build don't wait for it.
+# Full suite (full-suite.yml) runs this first, and skips Deploy and the Android app if it fails.
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     tags: ['v*']
 

@@ -107,5 +107,7 @@ Only accounts in that list, signed in with Google, can call the `/admin` API. A 
 ## CI
 CI (tests and the web build) runs only on demand (Actions → CI → Run workflow) or when you push a version tag such as `v0.3.0`. Deploys don't wait for it.
 
+**Full suite** (Actions → Full suite → Run workflow) runs CI, then Deploy, then the Android app, one after another. It stops at the first failure, so a failing CI run never deploys.
+
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.
