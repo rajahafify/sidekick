@@ -1,15 +1,16 @@
 name: CI
 
-# Tests every pull request and push to main, and builds the Android APK.
+# Tests the backend and app, and builds the Android APK. While we're prototyping it only runs on
+# demand (Actions → CI → Run workflow) or when a version tag like v0.3.0 is pushed. It never blocks
+# a deploy: the backend Deploy workflow and the Cloudflare Pages build don't wait for it.
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
+  push:
+    tags: ['v*']
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   backend:

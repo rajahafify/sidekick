@@ -92,5 +92,16 @@ Keep the `.jks` file safe and out of git. For CI add the secrets `ANDROID_KEYSTO
 
 After that, every push to main rebuilds the site, and every PR gets a preview link. Add the `*.pages.dev` address as a JavaScript origin on the Google Web client if you want sign-in on previews. (The AWS stack also still creates a CloudFront site, `SiteUrl`; it's unused and costs next to nothing.)
 
+### 7. Admin site: admin-sidekick.artifisi.com
+The admin screen lists open reports, every event and everyone, and can delete them. It is the same web build: on a host name starting with `admin-` the app shows only the admin screen (elsewhere it's at `/admin`).
+1. The Pages project → Custom domains → add `admin-sidekick.artifisi.com`.
+2. Google Web client → Authorized JavaScript origins → add `https://admin-sidekick.artifisi.com`.
+3. Open the admin site and sign in with Google. It shows your account id. Add it to the repo variable `ADMIN_IDENTITY_IDS` (comma-separated for several admins), then run **Deploy** again.
+
+Only accounts in that list, signed in with Google, can call the `/admin` API. A guest never can.
+
+## CI
+CI (tests, web build, Android APK) runs only on demand (Actions → CI → Run workflow) or when you push a version tag such as `v0.3.0`. Deploys don't wait for it.
+
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.

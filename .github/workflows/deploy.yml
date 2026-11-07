@@ -8,7 +8,8 @@ name: Deploy
 #             AWS_DEPLOY_ROLE_ARN                         optional: once set, used instead of the key
 #             OPENROUTER_API_KEY                          the sidekick's model key (stored in SSM)
 #   variables GOOGLE_WEB_CLIENT_ID, ALERT_EMAIL
-#             optional: SITE_DOMAIN, SITE_CERTIFICATE_ARN, ANDROID_CERT_SHA256, LLM_PROVIDER, MODEL_ID
+#             optional: SITE_DOMAIN, SITE_CERTIFICATE_ARN, ANDROID_CERT_SHA256, LLM_PROVIDER, MODEL_ID,
+#                       ADMIN_IDENTITY_IDS (comma-separated account ids that can use the admin screen)
 on:
   push:
     branches: [main]
@@ -95,6 +96,7 @@ jobs:
           ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openrouter' }}
           MODEL_ID: ${{ vars.MODEL_ID }}
+          ADMIN_IDENTITY_IDS: ${{ vars.ADMIN_IDENTITY_IDS }}
         run: |
           npx cdk deploy --require-approval never --outputs-file out.json \
             -c googleClientId="$GOOGLE_WEB_CLIENT_ID" \
@@ -103,6 +105,7 @@ jobs:
             -c siteCertificateArn="$SITE_CERTIFICATE_ARN" \
             -c androidCertSha256="$ANDROID_CERT_SHA256" \
             -c llmProvider="$LLM_PROVIDER" \
+            -c adminIds="$ADMIN_IDENTITY_IDS" \
             ${MODEL_ID:+-c modelId="$MODEL_ID"}
       - id: out
         name: Outputs

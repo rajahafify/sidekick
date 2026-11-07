@@ -21,6 +21,7 @@ new SidekickStack(app, 'Sidekick', {
   monthlyBudgetUsd: Number(ctx('monthlyBudgetUsd', '25')),
   apiConcurrency: Number(ctx('apiConcurrency', '0')),
   placesCountries: ctx('placesCountries', 'MYS'),
+  adminIds: ctx('adminIds', ''),
   siteDomain: ctx('siteDomain') || undefined,
   siteCertificateArn: ctx('siteCertificateArn') || undefined,
   androidCertSha256: ctx('androidCertSha256') || undefined,

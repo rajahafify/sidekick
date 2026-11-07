@@ -268,3 +268,42 @@ describe('sidekick status', () => {
     expect((await s.call(alice, 'GET', '/status')).body.lastError).toMatchObject({ error: 'OpenRouter 429: busy' });
   });
 });
+
+describe('admin', () => {
+  const admin = alice;
+
+  it('only lets listed, signed-in accounts in', async () => {
+    const s = setup({ adminIds: [alice.id, guest.id] });
+    expect((await s.call(alice, 'GET', '/me')).body).toMatchObject({ id: alice.id, admin: true });
+    expect((await s.call(bob, 'GET', '/me')).body.admin).toBe(false);
+    expect((await s.call(bob, 'GET', '/admin/overview')).status).toBe(403);
+    // A guest identity is never an admin, even if listed.
+    expect((await s.call(guest, 'GET', '/admin/overview')).status).toBe(403);
+  });
+
+  it('lists people, events and reports, and deletes them', async () => {
+    const s = setup({ adminIds: [admin.id] });
+    const id = await room(s, [alice, bob, carol]);
+    await s.call(carol, 'POST', '/report', { uid: bob.id, eventId: id, reason: 'Spam' });
+
+    const o = (await s.call(admin, 'GET', '/admin/overview')).body;
+    expect(o.users.map((u: any) => u.id).sort()).toEqual([alice.id, bob.id, carol.id].sort());
+    expect(o.events.map((e: any) => e.id)).toContain(id);
+    expect(o.reports).toHaveLength(1);
+    expect(o.reports[0]).toMatchObject({ reported: bob.id, reportedName: 'bob', reason: 'Spam' });
+
+    const ev = (await s.call(admin, 'GET', `/admin/events/${id}`)).body;
+    expect(ev.attendees).toHaveLength(3);
+
+    await s.call(admin, 'DELETE', `/admin/reports/${o.reports[0].id}`);
+    expect((await s.call(admin, 'GET', '/admin/overview')).body.reports).toHaveLength(0);
+
+    await s.call(admin, 'DELETE', `/admin/users/${encodeURIComponent(bob.id)}`);
+    expect((await s.call(bob, 'GET', '/me')).body.profile).toBeNull();
+    expect((await s.call(admin, 'GET', `/admin/events/${id}`)).body.attendees).toHaveLength(2);
+
+    await s.call(admin, 'DELETE', `/admin/events/${id}`);
+    expect((await s.call(admin, 'GET', `/admin/events/${id}`)).status).toBe(404);
+    expect(await s.store.query(`USER#${alice.id}`, 'EVENT#')).toHaveLength(0);
+  });
+});

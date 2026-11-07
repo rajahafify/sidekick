@@ -30,6 +30,8 @@ export type SidekickProps = StackProps & {
   llmProvider: 'openrouter' | 'bedrock';
   /** OpenRouter model id, or Bedrock model / inference profile id. */
   modelId: string;
+  /** Comma-separated Cognito identity ids allowed to use the admin screen. */
+  adminIds?: string;
   /** SSM SecureString holding the OpenRouter API key. */
   openRouterKeyParam: string;
   /** Region to call Bedrock in (the model must be enabled there). */
@@ -105,6 +107,7 @@ export class SidekickStack extends Stack {
         OPENROUTER_KEY_PARAM: props.openRouterKeyParam,
         BEDROCK_REGION: props.bedrockRegion,
         PLACES_COUNTRIES: props.placesCountries,
+        ADMIN_IDS: props.adminIds ?? '',
       },
       bundling: { minify: true, sourceMap: true, target: 'node22' },
     });

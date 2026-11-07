@@ -24,4 +24,11 @@ class Config {
   static bool get configured => useDevApi || (identityPoolId.isNotEmpty && apiUrl.isNotEmpty);
 
   static String eventLink(String id) => '$siteUrl/e/$id';
+
+  /// The admin site (admin-sidekick.artifisi.com) is this same web build on another host name:
+  /// there the app only shows the admin screen.
+  static bool get adminHost {
+    final h = Uri.base.host;
+    return h.startsWith('admin-') || h.startsWith('admin.');
+  }
 }
