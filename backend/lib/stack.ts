@@ -300,6 +300,17 @@ export class SidekickStack extends Stack {
           resources: [`arn:aws:iam::${this.account}:role/cdk-*`],
         }),
       );
+      // Deploy stores the model key, and the Android workflow keeps its signing key, in SSM, and
+      // reads the stack outputs.
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ['ssm:GetParameter', 'ssm:PutParameter'],
+          resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/sidekick/*`],
+        }),
+      );
+      deployRole.addToPolicy(
+        new iam.PolicyStatement({ actions: ['cloudformation:DescribeStacks'], resources: [this.stackId] }),
+      );
       new CfnOutput(this, 'DeployRoleArn', { value: deployRole.roleArn });
     }
 

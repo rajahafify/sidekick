@@ -1,0 +1,170 @@
+name: Android app
+
+# Builds the signed Android app. Run it from Actions → Android app → Run workflow, or push a version
+# tag like v0.3.0 to also publish the APK as a GitHub release.
+#
+# Nothing to set up by hand except one Google step (below). On the first run this workflow:
+#   - makes the release signing key and keeps it in AWS SSM Parameter Store (/sidekick/android/*),
+#     so every later build is signed with the same key. Never delete those parameters: an app signed
+#     with a different key can't update the installed one.
+#   - reads the API and sign-in settings straight from the deployed AWS stack (no repo variables).
+#   - commits the key's SHA-256 to app/web/.well-known/assetlinks.json, so event links open the app.
+#   - prints the key's SHA-1 in the run summary. Paste it once into Google Cloud → Clients → Create
+#     client → Android (package com.artifisi.sidekick), or Google sign-in won't work in the app.
+#
+# Uses the same AWS secrets as Deploy (AWS_DEPLOY_ROLE_ARN, or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)
+# and the GOOGLE_WEB_CLIENT_ID variable. An ANDROID_KEYSTORE_BASE64 secret, if you add one, wins.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  id-token: write
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-southeast-1
+  USE_ROLE: ${{ secrets.AWS_DEPLOY_ROLE_ARN != '' }}
+  KEY_ALIAS: sidekick
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - if: env.USE_ROLE == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - if: env.USE_ROLE != 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: App settings from the deployed stack
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          aws cloudformation describe-stacks --stack-name Sidekick --query 'Stacks[0].Outputs' > "$RUNNER_TEMP/outputs.json" \
+            || { echo "::error::No Sidekick stack in $AWS_REGION yet. Run the Deploy workflow first."; exit 1; }
+          python3 - <<'PY'
+          import json, os
+          out = {o['OutputKey']: o['OutputValue'] for o in json.load(open(os.environ['RUNNER_TEMP'] + '/outputs.json'))}
+          env = {'AWS_REGION': out.get('Region', os.environ['AWS_REGION']),
+                 'API_URL': out['ApiUrl'], 'IDENTITY_POOL_ID': out['IdentityPoolId'],
+                 'GOOGLE_WEB_CLIENT_ID': os.environ.get('GOOGLE_WEB_CLIENT_ID', '')}
+          json.dump({k: v for k, v in env.items() if v}, open('env.json', 'w'))
+          print(json.dumps(env, indent=2))
+          PY
+
+      - name: Release signing key (made once, kept in SSM)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SECRET_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          ks="$RUNNER_TEMP/release.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using the ANDROID_KEYSTORE_BASE64 secret."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$ks"
+            pass="$KEYSTORE_PASSWORD"; alias="${SECRET_ALIAS:-$KEY_ALIAS}"
+          elif pass=$(aws ssm get-parameter --name /sidekick/android/keystore-password --with-decryption --query Parameter.Value --output text 2>/dev/null); then
+            echo "Using the key in SSM."
+            aws ssm get-parameter --name /sidekick/android/keystore --with-decryption --query Parameter.Value --output text | base64 -d > "$ks"
+            alias="$KEY_ALIAS"
+          else
+            echo "No key yet: making one and storing it in SSM."
+            pass=$(openssl rand -hex 24); alias="$KEY_ALIAS"
+            keytool -genkeypair -keystore "$ks" -storetype PKCS12 -alias "$alias" -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass "$pass" -keypass "$pass" -dname "CN=Sidekick, O=Artifisi"
+            aws ssm put-parameter --name /sidekick/android/keystore --type SecureString --tier Intelligent-Tiering \
+              --value "$(base64 -w0 "$ks")" >/dev/null
+            aws ssm put-parameter --name /sidekick/android/keystore-password --type SecureString --value "$pass" >/dev/null
+          fi
+          echo "::add-mask::$pass"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$ks"
+            echo "ANDROID_KEYSTORE_PASSWORD=$pass"
+            echo "ANDROID_KEY_ALIAS=$alias"
+            echo "ANDROID_KEY_PASSWORD=$pass"
+          } >> "$GITHUB_ENV"
+          certs=$(keytool -list -v -keystore "$ks" -alias "$alias" -storepass "$pass")
+          echo "SHA1=$(echo "$certs" | awk '/SHA1:/ {print $2; exit}')" >> "$GITHUB_ENV"
+          echo "SHA256=$(echo "$certs" | awk '/SHA256:/ {print $2; exit}')" >> "$GITHUB_ENV"
+
+      - name: App links (commit the key's fingerprint)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          python3 - <<'PY'
+          import json, os
+          links = [{'relation': ['delegate_permission/common.handle_all_urls'],
+                    'target': {'namespace': 'android_app', 'package_name': 'com.artifisi.sidekick',
+                               'sha256_cert_fingerprints': [os.environ['SHA256']]}}]
+          os.makedirs('web/.well-known', exist_ok=True)
+          json.dump(links, open('web/.well-known/assetlinks.json', 'w'), indent=2)
+          PY
+          if git diff --quiet -- web/.well-known && git ls-files --error-unmatch web/.well-known/assetlinks.json >/dev/null 2>&1; then
+            echo "Already committed."
+          else
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add web/.well-known/assetlinks.json
+            git commit -m "Add the Android signing key fingerprint for app links"
+            git push || echo "::warning::Couldn't push assetlinks.json. Set ANDROID_CERT_SHA256 in Cloudflare Pages to $SHA256 instead."
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build the APK and the Play Store bundle
+        run: |
+          flutter build apk --release --dart-define-from-file=env.json
+          flutter build appbundle --release --dart-define-from-file=env.json
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/sidekick.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sidekick-android
+          path: |
+            ${{ runner.temp }}/sidekick.apk
+            app/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+      - name: GitHub release (version tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/sidekick.apk" --generate-notes --title "Sidekick $GITHUB_REF_NAME"
+
+      - name: Summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Android app built
+
+          Download **sidekick-android** below (sidekick.apk installs directly; the .aab is for the Play Store).
+
+          | Signing key | Fingerprint |
+          |---|---|
+          | SHA-1 | \`$SHA1\` |
+          | SHA-256 | \`$SHA256\` |
+
+          **One-time Google step:** Google Cloud → Google Auth Platform → Clients → Create client → **Android**,
+          package \`com.artifisi.sidekick\`, SHA-1 above. Without it, Google sign-in fails in the app (guest still works).
+          EOF

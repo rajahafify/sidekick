@@ -51,7 +51,7 @@ Do these once. Nothing here needs a Google Cloud billing account.
 1. In [Google Cloud console](https://console.cloud.google.com/), create a new project (for example `sidekick-auth`). **Don't link a billing account** and don't enable any APIs: sign-in doesn't need them.
 2. Google Auth Platform → Branding: app name **Sidekick** and your support email. Leave the logo off for now: a logo starts Google's brand verification. Audience: External. While the app is in **Testing**, add yourself and testers under Test users (up to 100).
 3. Clients → Create client → **Web application**, name "Sidekick". Under **Authorized JavaScript origins** add `https://sidekick.artifisi.com` (plus `http://localhost:8080` for local testing). No redirect URIs. Copy the **client ID**: this is `GOOGLE_WEB_CLIENT_ID`. Android uses the same ID.
-4. Create another client → **Android**: package `com.artifisi.sidekick`, and the **SHA-1** of your release key (step 5). Add a second Android client with the debug key's SHA-1 if you want sign-in in debug builds (`cd app/android && ./gradlew signingReport`).
+4. Later, after the first Android build (step 4): create another client → **Android** with package `com.artifisi.sidekick` and the SHA-1 from that run's summary.
 
 ### 2. The sidekick's model
 **Now: OpenRouter (free).** Make a key at https://openrouter.ai/settings/keys. It goes in GitHub as the `OPENROUTER_API_KEY` secret (step 3), and the deploy stores it in AWS SSM Parameter Store, never in the app. Without it the sidekick uses its template, so nothing breaks. Free models are rate limited and may log prompts, so this is for the pilot only.
@@ -71,22 +71,26 @@ After that, every push to main that touches `app/` or `backend/` deploys again.
 
 Other settings, as repo variables: `MODEL_ID`, `SITE_DOMAIN`, `SITE_CERTIFICATE_ARN`, `ANDROID_CERT_SHA256`. For a manual deploy, `cd backend && npx cdk deploy -c googleClientId=...` also works (context keys: `monthlyBudgetUsd`, `apiConcurrency` (off by default; new accounts cannot reserve Lambda concurrency), `llmProvider`, `modelId`, `bedrockRegion`, `placesCountries`, `githubRepo`, `githubOidcProviderArn`).
 
-### 4. Android builds
-CI builds the APK on every push (Actions → CI → `sidekick-apk` artifact). For a local build, copy `app/env.example.json` to `app/env.json`, fill it in with the deploy outputs, and run `cd app && flutter build apk --release --dart-define-from-file=env.json`.
+### 4. Android app
+Actions → **Android app** → Run workflow (or push a version tag like `v0.3.0` to also publish a GitHub release). It needs nothing beyond the Deploy settings:
+- It reads the API and sign-in settings from the deployed stack.
+- On its first run it makes the release signing key and keeps it in AWS SSM (`/sidekick/android/keystore` and `/sidekick/android/keystore-password`), so every build is signed with the same key. Don't delete those: an app signed with another key can't update the installed one.
+- It commits the key's SHA-256 to `app/web/.well-known/assetlinks.json`, so event links open the app.
+- The run summary shows the key's SHA-1. **Once**, paste it into Google Cloud → Clients → Create client → **Android**, package `com.artifisi.sidekick`. Without it Google sign-in fails in the app (guest still works).
 
-### 5. Release signing key (Android)
-```sh
-keytool -genkeypair -v -keystore sidekick-release.jks -alias sidekick -keyalg RSA -keysize 2048 -validity 10000
-keytool -list -v -keystore sidekick-release.jks -alias sidekick   # shows the SHA-1 and SHA-256
-```
-Keep the `.jks` file safe and out of git. For CI add the secrets `ANDROID_KEYSTORE_BASE64` (`base64 -w0 sidekick-release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. For local builds, write `app/android/key.properties` with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. Put the SHA-1 on the Android OAuth client (step 1.4).
+Download `sidekick-android` from the run: `sidekick.apk` installs directly, the `.aab` is for the Play Store.
+
+For a local build, copy `app/env.example.json` to `app/env.json`, fill it in with the deploy outputs, and run `cd app && flutter build apk --release --dart-define-from-file=env.json`. It's signed with the debug key unless you write `app/android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); Google sign-in in debug builds needs a second Android client with the debug SHA-1 (`cd app/android && ./gradlew signingReport`).
+
+### 5. Your own signing key (optional)
+To use a key you made yourself instead, add the secrets `ANDROID_KEYSTORE_BASE64` (`base64 -w0 sidekick-release.jks`), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. They win over the key in SSM.
 
 ### 6. The website: Cloudflare Pages + sidekick.artifisi.com
 1. Cloudflare dashboard → Workers & Pages → Create → Pages → **Connect to Git** → pick `rajahafify/sidekick`.
 2. Build settings: Framework preset **None**, Root directory `app`, Build command `bash cloudflare-build.sh`, Build output directory `build/web`.
 3. Environment variables (Production, and Preview if you want PR previews), from the Deploy run's outputs:
    - `API_URL` = `ApiUrl`, `IDENTITY_POOL_ID` = `IdentityPoolId`, `GOOGLE_WEB_CLIENT_ID` = your Web client ID.
-   - Optional: `ANDROID_CERT_SHA256` (step 5) for Android app links.
+   - Optional: `ANDROID_CERT_SHA256` overrides the committed Android app-link fingerprint (step 4).
 4. Save and Deploy. The first build takes a few minutes (it downloads Flutter).
 5. The project → Custom domains → add `sidekick.artifisi.com`. If the old Sidekick Pages project still owns that domain, remove it there first.
 
@@ -101,7 +105,7 @@ The admin screen lists open reports, every event and everyone, and can delete th
 Only accounts in that list, signed in with Google, can call the `/admin` API. A guest never can.
 
 ## CI
-CI (tests, web build, Android APK) runs only on demand (Actions → CI → Run workflow) or when you push a version tag such as `v0.3.0`. Deploys don't wait for it.
+CI (tests and the web build) runs only on demand (Actions → CI → Run workflow) or when you push a version tag such as `v0.3.0`. Deploys don't wait for it.
 
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.
