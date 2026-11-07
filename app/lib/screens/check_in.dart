@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/api.dart';
+import '../data/check_in.dart';
 import '../data/location.dart';
 import '../logic/geo_when.dart';
 import '../main.dart';
@@ -78,31 +79,15 @@ class _CheckInViewState extends State<CheckInView> {
       pending = true;
       error = null;
     });
-    final api = SessionScope.of(context).api;
     try {
-      // We only need your location if we know where the place is.
-      if (fix == null && picked != null) fix = await currentFix();
-      final now = DateTime.now();
-      final dayStart = DateTime(now.year, now.month, now.day);
-      String two(int n) => n.toString().padLeft(2, '0');
-      final id = await api.checkIn({
-        'place': place.text.trim(),
-        if (picked != null) 'placeId': picked!.placeId,
-        if (picked?.lat != null && picked?.lng != null) ...{'lat': picked!.lat, 'lng': picked!.lng},
-        'day': '${now.year}${two(now.month)}${two(now.day)}',
-        'dayStart': dayStart.toUtc().toIso8601String(),
-        if (fix != null) 'fix': {'lat': fix!.lat, 'lng': fix!.lng, 'accuracy': fix!.accuracy},
-      });
+      final id = await checkInToPlace(
+        SessionScope.of(context).api,
+        label: place.text.trim(),
+        place: picked,
+        fix: fix,
+      );
       if (mounted) context.push('/e/$id');
     } on ApiError catch (e) {
-      if (e.needsLocation) {
-        final here = await currentFix();
-        if (here != null && mounted) {
-          fix = here;
-          setState(() => pending = false);
-          return _checkIn();
-        }
-      }
       if (mounted) setState(() => error = e.message);
     } finally {
       if (mounted) setState(() => pending = false);
@@ -166,6 +151,15 @@ class _CheckInViewState extends State<CheckInView> {
               hint: 'Common Ground, Bukit Bintang',
               onPicked: (p) => setState(() => picked = p),
             ),
+            if (picked != null && picked!.placeId.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => context.push('/p/${Uri.encodeComponent(picked!.placeId)}'),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16, color: C.go),
+                  label: const Text('See this place'),
+                ),
+              ),
             ErrorNote(error),
             const SizedBox(height: 18),
             ValueListenableBuilder(

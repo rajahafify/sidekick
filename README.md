@@ -15,7 +15,7 @@ Everything runs on AWS, in one CDK stack.
 | API | API Gateway (HTTP API, IAM auth) → Lambda (`backend/src`) | One Node 22 Lambda. API Gateway checks each request's signature and tells the Lambda who is calling and whether they're a guest. |
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
 | Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
-| Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
+| Places | Amazon Location Service, and Google Places API (New) | Amazon: place suggestions and "near me" for check-ins (IAM, no key). Google: a place's page, with photos, hours, phone, rating and website. Its key lives in SSM Parameter Store and is only ever sent to Google. |
 | Website | Cloudflare Pages | The Flutter web build, built by Cloudflare from this repo (`app/cloudflare-build.sh`) on every push, at sidekick.artifisi.com. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
 | Cost guard | AWS Budgets, Lambda concurrency cap, API throttling | Email alert at 50% of the monthly budget and when the forecast passes 100%. |
 
@@ -26,6 +26,7 @@ Everything runs on AWS, in one CDK stack.
 - A match needs two Connects. Blocks hide people both ways.
 - Guests can't swipe or see matches.
 - When an event has a location, you have to be within 500 m to check in (checked on the server).
+- Place pages send Google only a place's name, address and position. Nothing about the people who check in.
 
 ## Local development
 
@@ -71,6 +72,16 @@ After that, every push to main that touches `app/` or `backend/` deploys again.
 
 Other settings, as repo variables: `MODEL_ID`, `SITE_DOMAIN`, `SITE_CERTIFICATE_ARN`, `ANDROID_CERT_SHA256`. For a manual deploy, `cd backend && npx cdk deploy -c googleClientId=...` also works (context keys: `monthlyBudgetUsd`, `apiConcurrency` (off by default; new accounts cannot reserve Lambda concurrency), `llmProvider`, `modelId`, `bedrockRegion`, `placesCountries`, `githubRepo`, `githubOidcProviderArn`).
 
+### 3b. Place pages from Google (optional)
+Without this, a place's page shows only what Amazon Location knows (name, address, a map link). With it, the page also gets photos, opening hours, phone, website and rating from Google.
+1. **A new Google Cloud project** for this (don't reuse an old one). Link a billing account: Places needs one, and the free monthly allowance covers a pilot.
+2. APIs & Services → Library → enable **Places API (New)**.
+3. Billing → Budgets & alerts → a monthly budget of about US$10, with alerts at 50%, 90% and 100% sent to you.
+4. APIs & Services → Credentials → Create credentials → **API key**. Under API restrictions, choose **Restrict key** and select **Places API (New)** only, so a leaked key can't call anything else. Leave application restrictions at **None**: the key is only used by the Lambda, which has no fixed address. Then, under Places API (New) → Quotas, lower the daily request limits.
+5. Add the key as the repo secret `GOOGLE_PLACES_API_KEY`, then run **Deploy**. It's stored as the SSM SecureString `/sidekick/google-places-key`. Don't put the key anywhere else.
+
+The backend caps Google use on its own too: 200 billed calls a day (a place's match and full details), 500 place-page views a day that load photos, and 60 place pages a person a day. A place's match is kept for a year, its details for a day, and photos are never stored, which is what Google's terms require.
+
 ### 4. Android app
 Actions → **Android app** → Run workflow (or push a version tag like `v0.3.0` to also publish a GitHub release). It needs nothing beyond the Deploy settings:
 - It reads the API and sign-in settings from the deployed stack.
@@ -109,3 +120,5 @@ CI (tests and the web build) runs only on demand (Actions → CI → Run workflo
 
 ## Costs
 On demand everywhere, so an idle pilot costs close to nothing: DynamoDB, Lambda, API Gateway and CloudFront are cents at pilot scale, Location Service has a free tier, and Bedrock is pay per call (Haiku, cached, at most 15 scouts and 40 openers per person per event). The budget alert emails you before anything surprising happens.
+
+Place pages are billed by Google per call once a month's free allowance is used up. Look at Google's pricing page for the current figures. The day's caps above bound the worst case, and the budget alert on the Google billing account is the second guard. Read the pricing page before raising any cap.

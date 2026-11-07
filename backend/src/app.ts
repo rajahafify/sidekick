@@ -14,7 +14,8 @@ import { z } from 'zod';
 import { buildImportPrompt, pageText, parseEventHtml, parseImportReply, safeUrl, type ImportedEvent } from './eventImport';
 import { formatDistance, distanceM, hash, insideFence, placeRoomId, type Fix } from './geo';
 import type { Model } from './model';
-import type { Places } from './places';
+import type { PlaceDetails, Places } from './places';
+import { placeWeekday, type GooglePhoto, type GooglePlace, type GooglePlaces } from './googlePlaces';
 import {
   buildPrompt,
   buildScoutPrompt,
@@ -34,6 +35,8 @@ export type Deps = {
   model: Model | null;
   modelName?: string;
   places: Places | null;
+  /** Google's listings for place pages. Null when there's no key: the pages show Amazon's details only. */
+  googlePlaces?: GooglePlaces | null;
   fetch: typeof fetch;
   now: () => number;
   /** Cognito identity ids that may use the admin endpoints (signed in with Google only). */
@@ -49,6 +52,12 @@ const IMPORTS_PER_USER_PER_DAY = 20;
 const PLACE_LOOKUPS_PER_USER_PER_DAY = 150;
 const EVENTS_PER_USER_PER_DAY = 20;
 const STATUS_CHECKS_PER_USER_PER_DAY = 30;
+const PLACE_PAGES_PER_USER_PER_DAY = 60;
+/** Google calls billed per call (a match, and full place details). Cached, so this is a ceiling. */
+const GOOGLE_BILLED_PER_DAY = 200;
+/** Place-page views that look up photos: one IDs-only place call, then up to three photo links each. */
+const GOOGLE_PHOTO_PER_DAY = 500;
+const PHOTOS_PER_PLACE_PAGE = 3;
 
 class HttpError extends Error {
   constructor(
@@ -256,6 +265,7 @@ export class App {
     if (is('POST', 'checkin')) return this.checkIn(me, body);
     if (is('POST', 'import-event')) return this.importEvent(me, body);
     if (is('POST', 'places')) return this.places(me, body);
+    if (is('POST', 'places', 'page')) return this.placePage(me, body);
     if (is('POST', 'block')) return this.block(me, body);
     if (is('POST', 'report')) return this.report(me, body);
     if (is('GET', 'status')) return this.status();
@@ -713,6 +723,95 @@ export class App {
       at: this.nowIso(),
     });
     return { ok: true };
+  }
+
+  // ---------- Place pages ----------
+
+  /**
+   * A place's page: what Amazon Location knows, its Google listing when there's a confident match
+   * (photos, hours, phone, website, rating), and who's checked in there on the day asked about.
+   * Guests can look. Google only ever sees the place's name, address and position.
+   */
+  private async placePage(me: Identity, body: unknown) {
+    const b = parse(z.object({ placeId: str(400).min(1), day: z.string().regex(/^\d{8}$/).optional() }), body);
+    const today = new Date(this.d.now()).toISOString().slice(0, 10);
+    if (!(await this.takeQuota(`rlpp:${today}:${me.id}`, PLACE_PAGES_PER_USER_PER_DAY, DAY_S)))
+      fail(429, "You've looked at a lot of places today. Try again tomorrow.");
+    const place = this.d.places ? await this.d.places.details(b.placeId).catch(() => null) : null;
+    if (!place) fail(404, 'Place not found.');
+    const g = await this.googleView(place!, today);
+    const p = g?.place;
+    return {
+      place: {
+        placeId: place!.placeId,
+        name: p?.name || place!.name,
+        address: p?.address || place!.address,
+        lat: p?.lat ?? place!.lat,
+        lng: p?.lng ?? place!.lng,
+        google: !!p,
+        phone: p?.phone ?? '',
+        website: p?.website ?? '',
+        mapsUri: p?.mapsUri ?? '',
+        rating: p?.rating ?? null,
+        ratingCount: p?.ratingCount ?? 0,
+        hours: p?.hours ?? [],
+        /** Monday is 0, so the page can mark today's hours. */
+        today: placeWeekday(p?.utcOffsetMinutes ?? null, this.d.now()),
+        photos: g?.photos ?? [],
+      },
+      room: b.day ? await this.placeRoom(me, placeRoomId(place!.placeId, place!.name, b.day)) : null,
+    };
+  }
+
+  /**
+   * The Google side of a place page, with the day's caps. Null when there's no listing, no key,
+   * or a cap is spent. Nothing is remembered from a failed call, so the next view tries again.
+   */
+  private async googleView(
+    place: PlaceDetails,
+    today: string,
+  ): Promise<{ place: GooglePlace; photos: GooglePhoto[] } | null> {
+    const g = this.d.googlePlaces;
+    // A nameless place can't be matched, and a "no listing" answer for it would be remembered for no reason.
+    if (!g || !place.name) return null;
+    const billed = () => this.takeQuota(`gbilled:${today}`, GOOGLE_BILLED_PER_DAY, DAY_S);
+
+    // Which listing is this place? Google lets us keep place IDs, so it's remembered for a year.
+    // "No listing" is remembered only for a week, in case Google adds one.
+    const matchKey = `gmatch:${place.placeId}`;
+    let match = await this.cached<{ id: string | null }>(matchKey);
+    if (!match) {
+      if (!(await billed())) return null;
+      match = await g.match(place.name, place.address, { lat: place.lat, lng: place.lng });
+      if (!match) return null;
+      await this.cache(matchKey, match, match.id ? 365 * DAY_S : 7 * DAY_S);
+    }
+    if (!match.id) return null;
+
+    // The listing's details: kept for a day at most.
+    const detailsKey = `gplace:${match.id}`;
+    let details = await this.cached<GooglePlace>(detailsKey);
+    if (!details) {
+      if (!(await billed())) return null;
+      details = await g.details(match.id);
+      if (!details) return null;
+      await this.cache(detailsKey, details, DAY_S);
+    }
+
+    // Photos are never stored: Google doesn't allow caching a photo's name, so they're looked up each time.
+    const photos = (await this.takeQuota(`gphoto:${today}`, GOOGLE_PHOTO_PER_DAY, DAY_S))
+      ? await g.photos(match.id, PHOTOS_PER_PLACE_PAGE)
+      : [];
+    return { place: details, photos };
+  }
+
+  /** Who's checked in at a place room. The same counts anyone can see on the room itself. */
+  private async placeRoom(me: Identity, id: string) {
+    const [cards, mine] = await Promise.all([
+      this.store.query(`EVENT#${id}`, 'ATT#'),
+      this.store.get(`EVENT#${id}`, `ATT#${me.id}`),
+    ]);
+    return { id, count: cards.length, checkedIn: mine !== null };
   }
 
   // ---------- Places and imports ----------

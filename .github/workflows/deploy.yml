@@ -7,6 +7,7 @@ name: Deploy
 #   secrets   AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY  an IAM admin access key, for the first run
 #             AWS_DEPLOY_ROLE_ARN                         optional: once set, used instead of the key
 #             OPENROUTER_API_KEY                          the sidekick's model key (stored in SSM)
+#             GOOGLE_PLACES_API_KEY                       optional: Google's listings for place pages (stored in SSM)
 #   variables GOOGLE_WEB_CLIENT_ID, ALERT_EMAIL, GOOGLE_ANDROID_CLIENT_ID (for sign-in in the Android app)
 #             optional: SITE_DOMAIN, SITE_CERTIFICATE_ARN, ANDROID_CERT_SHA256, LLM_PROVIDER, MODEL_ID,
 #                       ADMIN_IDENTITY_IDS (comma-separated account ids that can use the admin screen)
@@ -78,6 +79,16 @@ jobs:
             echo "Stored."
           else
             echo "::warning::No OPENROUTER_API_KEY secret, so the sidekick uses its template."
+          fi
+      - name: Store the Google Places key
+        env:
+          KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then
+            aws ssm put-parameter --name /sidekick/google-places-key --type SecureString --value "$KEY" --overwrite >/dev/null
+            echo "Stored."
+          else
+            echo "::warning::No GOOGLE_PLACES_API_KEY secret, so place pages show only what Amazon Location knows."
           fi
       - name: Bootstrap CDK (first run only)
         env:

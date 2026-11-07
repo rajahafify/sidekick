@@ -11,6 +11,7 @@ import 'screens/event.dart';
 import 'screens/home.dart';
 import 'screens/match.dart';
 import 'screens/new_event.dart';
+import 'screens/place.dart';
 import 'screens/profile.dart';
 import 'screens/welcome.dart';
 import 'theme.dart';
@@ -105,6 +106,7 @@ GoRouter _router(Session session) => GoRouter(
         GoRoute(path: '/places', builder: (_, _) => const HomeShell(tab: 1)),
         GoRoute(path: '/me', builder: (_, _) => const HomeShell(tab: 2)),
         GoRoute(path: '/checkin', builder: (_, _) => const CheckInScreen()),
+        GoRoute(path: '/p/:id', builder: (_, s) => PlaceScreen(placeId: s.pathParameters['id']!)),
         GoRoute(path: '/new', builder: (_, _) => const NewEventScreen()),
         GoRoute(
           path: '/e/:id',

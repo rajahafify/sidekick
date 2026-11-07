@@ -381,16 +381,28 @@ class _EventScreenState extends State<EventScreen> {
             const SizedBox(height: 8),
             if (e.place.isNotEmpty)
               GestureDetector(
-                onTap: () => launchUrl(
-                  Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': e.place}),
-                  mode: LaunchMode.externalApplication,
-                ),
+                // A check-in room opens its place's page (which links to Google Maps); an event opens Maps.
+                onTap: () {
+                  final placeId = e.placeId;
+                  if (e.isPlace && placeId != null && placeId.isNotEmpty) {
+                    context.push('/p/${Uri.encodeComponent(placeId)}');
+                  } else {
+                    launchUrl(
+                      Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': e.place}),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  }
+                },
                 child: Text.rich(
                   TextSpan(children: [
                     TextSpan(text: '${e.place} '),
-                    const WidgetSpan(
+                    WidgetSpan(
                       alignment: PlaceholderAlignment.middle,
-                      child: Icon(Icons.north_east_rounded, size: 15, color: C.muted),
+                      child: Icon(
+                        e.isPlace && e.placeId != null ? Icons.arrow_forward_rounded : Icons.north_east_rounded,
+                        size: 15,
+                        color: C.muted,
+                      ),
                     ),
                   ]),
                   style: const TextStyle(color: C.muted, fontSize: 16),

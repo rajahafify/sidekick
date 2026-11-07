@@ -177,6 +177,11 @@ class Api {
     }
   }
 
+  /// A place's page: its details (Google's when there is a listing), and today's room there.
+  /// [day] is today on the phone, as yyyymmdd.
+  Future<PlacePage> placePage(String placeId, String day) async =>
+      PlacePage.fromMap(await _send('POST', '/places/page', {'placeId': placeId, 'day': day}));
+
   static List<PlaceDetails> _placeList(Object? v) =>
       ((v as List?) ?? const []).whereType<Map>().map((p) => PlaceDetails.fromJson(p.cast<String, dynamic>())).toList();
 }

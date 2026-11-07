@@ -13,6 +13,7 @@ type IamEvent = APIGatewayProxyEventV2 & {
 };
 import { App, type Identity } from './app';
 import { bedrockModel, openRouterModel, ssmSecret, type Model } from './model';
+import { googlePlaces } from './googlePlaces';
 import { locationPlaces } from './places';
 import { DynamoStore } from './store';
 
@@ -31,6 +32,8 @@ const app = new App({
   model: pickModel(),
   modelName: env.MODEL_ID ? `${env.LLM_PROVIDER === 'openrouter' ? 'OpenRouter' : 'Bedrock'} ${env.MODEL_ID}` : undefined,
   places: env.PLACES === 'off' ? null : locationPlaces(env.AWS_REGION!, (env.PLACES_COUNTRIES ?? '').split(',').filter(Boolean)),
+  // Without the key in SSM, place pages show only what Amazon Location knows.
+  googlePlaces: googlePlaces(ssmSecret(env.GOOGLE_PLACES_KEY_PARAM || '/sidekick/google-places-key', env.AWS_REGION!)),
   fetch,
   now: () => Date.now(),
   adminIds: (env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),

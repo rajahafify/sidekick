@@ -147,6 +147,7 @@ class EventDoc {
     this.lng,
     this.sourceUrl,
     this.kind,
+    this.placeId,
   });
 
   final String id;
@@ -162,6 +163,9 @@ class EventDoc {
   /// 'place' for a check-in room at a place (one per place per day); null for events.
   final String? kind;
 
+  /// The place a check-in room is at, for its place page.
+  final String? placeId;
+
   bool get isPlace => kind == 'place';
   bool get hasLocation => lat != null && lng != null;
 
@@ -176,6 +180,7 @@ class EventDoc {
         lng: _num(m['lng']),
         sourceUrl: m['sourceUrl'] as String?,
         kind: m['kind'] as String?,
+        placeId: m['placeId'] as String?,
       );
 }
 
@@ -327,5 +332,101 @@ class PlaceDetails {
         address: '${j['address'] ?? ''}',
         lat: _num(j['lat']),
         lng: _num(j['lng']),
+      );
+}
+
+/// A place's page: what the map knows about it, its Google listing when there is one, and who is
+/// checked in there on the day asked about.
+class PlacePage {
+  const PlacePage({
+    required this.placeId,
+    required this.name,
+    this.address = '',
+    this.lat,
+    this.lng,
+    this.google = false,
+    this.phone = '',
+    this.website = '',
+    this.mapsUri = '',
+    this.rating,
+    this.ratingCount = 0,
+    this.hours = const [],
+    this.today,
+    this.photos = const [],
+    this.room,
+  });
+
+  final String placeId;
+  final String name;
+  final String address;
+  final double? lat;
+  final double? lng;
+
+  /// Whether Google's listing was matched to this place.
+  final bool google;
+  final String phone;
+  final String website;
+
+  /// The listing on Google Maps. Photos and details link back to it.
+  final String mapsUri;
+  final double? rating;
+  final int ratingCount;
+
+  /// One line per day from Monday, worded by Google. Empty when Google has no hours.
+  final List<String> hours;
+
+  /// Which line of [hours] is today at the place (Monday is 0), when Google said.
+  final int? today;
+  final List<PlacePhoto> photos;
+
+  /// Today's check-in room for this place, if there is one yet.
+  final PlaceRoom? room;
+
+  PlaceDetails get asPlace => PlaceDetails(placeId: placeId, name: name, address: address, lat: lat, lng: lng);
+
+  factory PlacePage.fromMap(Map<String, dynamic> m) {
+    final p = _map(m['place']);
+    return PlacePage(
+      placeId: '${p['placeId'] ?? ''}',
+      name: '${p['name'] ?? ''}',
+      address: '${p['address'] ?? ''}',
+      lat: _num(p['lat']),
+      lng: _num(p['lng']),
+      google: p['google'] == true,
+      phone: '${p['phone'] ?? ''}',
+      website: '${p['website'] ?? ''}',
+      mapsUri: '${p['mapsUri'] ?? ''}',
+      rating: _num(p['rating']),
+      ratingCount: (p['ratingCount'] as num?)?.toInt() ?? 0,
+      hours: _strings(p['hours']),
+      today: (p['today'] as num?)?.toInt(),
+      photos: ((p['photos'] as List?) ?? const []).map((x) => PlacePhoto.fromMap(_map(x))).toList(),
+      room: m['room'] is Map ? PlaceRoom.fromMap(_map(m['room'])) : null,
+    );
+  }
+}
+
+/// A photo on a place page, with the photographer's credit (Google asks for it wherever it's shown).
+class PlacePhoto {
+  const PlacePhoto({required this.url, this.author = '', this.authorUri = ''});
+  final String url;
+  final String author;
+  final String authorUri;
+
+  factory PlacePhoto.fromMap(Map<String, dynamic> m) =>
+      PlacePhoto(url: '${m['url'] ?? ''}', author: '${m['author'] ?? ''}', authorUri: '${m['authorUri'] ?? ''}');
+}
+
+/// The check-in room at a place for one day: how many are in it, and whether I am.
+class PlaceRoom {
+  const PlaceRoom({required this.id, this.count = 0, this.checkedIn = false});
+  final String id;
+  final int count;
+  final bool checkedIn;
+
+  factory PlaceRoom.fromMap(Map<String, dynamic> m) => PlaceRoom(
+        id: '${m['id'] ?? ''}',
+        count: (m['count'] as num?)?.toInt() ?? 0,
+        checkedIn: m['checkedIn'] == true,
       );
 }

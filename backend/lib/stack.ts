@@ -37,6 +37,8 @@ export type SidekickProps = StackProps & {
   adminIds?: string;
   /** SSM SecureString holding the OpenRouter API key. */
   openRouterKeyParam: string;
+  /** SSM SecureString holding the Google Places API key (place pages). Optional: pages fall back to Amazon's details. */
+  googlePlacesKeyParam: string;
   /** Region to call Bedrock in (the model must be enabled there). */
   bedrockRegion: string;
   /** Where the monthly budget alert goes. */
@@ -120,6 +122,7 @@ export class SidekickStack extends Stack {
         LLM_PROVIDER: props.llmProvider,
         MODEL_ID: props.modelId,
         OPENROUTER_KEY_PARAM: props.openRouterKeyParam,
+        GOOGLE_PLACES_KEY_PARAM: props.googlePlacesKeyParam,
         BEDROCK_REGION: props.bedrockRegion,
         PLACES_COUNTRIES: props.placesCountries,
         ADMIN_IDS: props.adminIds ?? '',
@@ -142,7 +145,10 @@ export class SidekickStack extends Stack {
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
-        resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter${props.openRouterKeyParam}`],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.openRouterKeyParam}`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter${props.googlePlacesKeyParam}`,
+        ],
       }),
     );
     fn.addToRolePolicy(

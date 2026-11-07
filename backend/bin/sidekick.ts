@@ -17,6 +17,7 @@ new SidekickStack(app, 'Sidekick', {
   llmProvider: ctx('llmProvider', 'openrouter') === 'bedrock' ? 'bedrock' : 'openrouter',
   modelId: ctx('modelId', ctx('llmProvider', 'openrouter') === 'bedrock' ? 'global.anthropic.claude-haiku-5-5' : 'openrouter/free'),
   openRouterKeyParam: ctx('openRouterKeyParam', '/sidekick/openrouter-api-key'),
+  googlePlacesKeyParam: ctx('googlePlacesKeyParam', '/sidekick/google-places-key'),
   bedrockRegion: ctx('bedrockRegion', 'us-east-1'),
   alertEmail: ctx('alertEmail') || undefined,
   monthlyBudgetUsd: Number(ctx('monthlyBudgetUsd', '25')),
