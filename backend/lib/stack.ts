@@ -26,6 +26,9 @@ import type { Construct } from 'constructs';
 export type SidekickProps = StackProps & {
   /** OAuth "Web application" client id from Google Cloud. Google ID tokens must be issued for it. */
   googleClientId: string;
+  /** OAuth "Android" client id. Android sign-in tokens name it as their authorized party, so the
+   *  identity pool must trust it too. */
+  googleAndroidClientId?: string;
   /** Where the sidekick's model runs: 'openrouter' (key in SSM) or 'bedrock' (IAM role). */
   llmProvider: 'openrouter' | 'bedrock';
   /** OpenRouter model id, or Bedrock model / inference profile id. */
@@ -85,7 +88,10 @@ export class SidekickStack extends Stack {
       identityPoolName: 'sidekick',
       allowUnauthenticatedIdentities: true,
       allowClassicFlow: false,
-      supportedLoginProviders: { 'accounts.google.com': props.googleClientId },
+      // Google accepts a comma-separated list: the web client, plus the Android client for the app.
+      supportedLoginProviders: {
+        'accounts.google.com': [props.googleClientId, props.googleAndroidClientId].filter(Boolean).join(','),
+      },
     });
 
     // ---------- API ----------

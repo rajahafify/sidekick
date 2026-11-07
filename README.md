@@ -76,7 +76,7 @@ Actions → **Android app** → Run workflow (or push a version tag like `v0.3.0
 - It reads the API and sign-in settings from the deployed stack.
 - On its first run it makes the release signing key and keeps it in AWS SSM (`/sidekick/android/keystore` and `/sidekick/android/keystore-password`), so every build is signed with the same key. Don't delete those: an app signed with another key can't update the installed one.
 - It commits the key's SHA-256 to `app/web/.well-known/assetlinks.json`, so event links open the app.
-- The run summary shows the key's SHA-1. **Once**, paste it into Google Cloud → Clients → Create client → **Android**, package `com.artifisi.sidekick`. Without it Google sign-in fails in the app (guest still works).
+- The run summary shows the key's SHA-1. **Once**, paste it into Google Cloud → Clients → Create client → **Android**, package `com.artifisi.sidekick`. Without it Google sign-in fails in the app (guest still works). Then copy that Android client's **client ID** into the repo variable `GOOGLE_ANDROID_CLIENT_ID` and re-run Deploy, so the sign-in pool accepts the app's tokens.
 
 Download `sidekick-android` from the run: `sidekick.apk` installs directly, the `.aab` is for the Play Store.
 
