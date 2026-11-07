@@ -7,40 +7,102 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/sign_in_sheet.dart';
+import '../widgets/sidekick_status.dart';
 import '../widgets/ui.dart';
 import 'check_in.dart';
 
-/// The three tabs: events, check in to a place, and you.
+/// Events and You, with the raised + in the middle (add an event or check in to a place).
+/// Tab 1 is the place check-in, reached through the +.
 class HomeShell extends StatelessWidget {
   const HomeShell({super.key, required this.tab});
   final int tab;
 
-  static const _paths = ['/', '/places', '/me'];
-
   @override
   Widget build(BuildContext context) => Scaffold(
         body: IndexedStack(index: tab, children: const [EventsTab(), CheckInView(), MeTab()]),
-        floatingActionButton: tab == 0
-            ? FloatingActionButton(
-                onPressed: () => context.push('/new'),
-                backgroundColor: C.ink,
-                foregroundColor: C.onInk,
-                shape: const CircleBorder(),
-                child: const Icon(Icons.add_rounded, size: 30),
-              )
-            : null,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: tab,
-          onDestinationSelected: (i) => context.go(_paths[i]),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.event_outlined), selectedIcon: Icon(Icons.event), label: 'Events'),
-            NavigationDestination(
-                icon: Icon(Icons.my_location_outlined), selectedIcon: Icon(Icons.my_location), label: 'Check in'),
-            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'You'),
-          ],
-        ),
+        bottomNavigationBar: _TabBar(tab: tab),
       );
 }
+
+class _TabBar extends StatelessWidget {
+  const _TabBar({required this.tab});
+  final int tab;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(int i, IconData icon, IconData active, String label, String path) {
+      final on = tab == i;
+      return Expanded(
+        child: InkWell(
+          onTap: () => context.go(path),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(on ? active : icon, color: on ? C.go : C.muted, size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(fontSize: 12, color: on ? C.go : C.muted, fontWeight: FontWeight.w500)),
+          ]),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: const BoxDecoration(color: C.paper, border: Border(top: BorderSide(color: C.line))),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
+            Row(children: [
+              item(0, Icons.calendar_today_outlined, Icons.calendar_today, 'Events', '/'),
+              const SizedBox(width: 88),
+              item(2, Icons.person_outline, Icons.person, 'You', '/me'),
+            ]),
+            Positioned(
+              top: -22,
+              child: Material(
+                color: C.go,
+                shape: const CircleBorder(),
+                elevation: 6,
+                shadowColor: C.go.withValues(alpha: 0.5),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => _addSheet(context),
+                  child: const SizedBox(width: 60, height: 60, child: Icon(Icons.add_rounded, size: 32, color: C.onInk)),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+void _addSheet(BuildContext context) => showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: C.surface,
+      showDragHandle: true,
+      builder: (sheet) {
+        Widget row(IconData icon, String title, String text, String path) => ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 4),
+              leading: Icon(icon, color: C.go),
+              title: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+              subtitle: Text(text, style: const TextStyle(color: C.muted)),
+              onTap: () {
+                Navigator.pop(sheet);
+                path == '/places' ? context.go(path) : context.push(path);
+              },
+            );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              row(Icons.event_outlined, 'Add an event', 'Paste its link, or fill it in.', '/new'),
+              row(Icons.my_location, 'Check in to a place', 'Coworking, café or venue. Meet who’s there today.', '/places'),
+            ]),
+          ),
+        );
+      },
+    );
 
 class EventsTab extends StatefulWidget {
   const EventsTab({super.key});
@@ -96,64 +158,57 @@ class _EventsTabState extends State<EventsTab> {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           children: [
             Row(children: [
-              const Expanded(child: Text('SIDEKICK', style: eyebrow)),
+              const Expanded(child: Align(alignment: Alignment.centerLeft, child: Wordmark())),
               GestureDetector(
                 onTap: () => context.go('/me'),
-                child: Avatar(name: session.profile?.displayName ?? '', url: session.profile?.photoURL ?? '', size: 34),
+                child: Avatar(name: session.profile?.displayName ?? '', url: session.profile?.photoURL ?? '', size: 38),
               ),
             ]),
-            const SizedBox(height: 18),
-            Text(first.isEmpty ? 'Hello' : 'Hi $first', style: displayStyle(46)),
-            const SizedBox(height: 8),
-            const Text('Going to an event? Tap + to add it, or open its link.',
-                style: TextStyle(color: C.muted, fontSize: 16)),
+            const SizedBox(height: 30),
+            Text(first.isEmpty ? 'Hello' : 'Hi $first', style: displayStyle(44)),
+            const SizedBox(height: 10),
+            const Text('Going to an event? Tap + to add it, or scan the QR code at the door.',
+                style: TextStyle(color: C.muted, fontSize: 17, height: 1.45)),
             if (session.guest) ...[
               const SizedBox(height: 18),
               _GuestBanner(onSignIn: () => askToSignIn(context, reason: 'Sign in to connect with people you meet.')),
             ],
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             SurfaceCard(
               onTap: () => context.go('/places'),
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
               child: Row(children: [
                 Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: C.go.withValues(alpha: 0.14), shape: BoxShape.circle),
-                  child: const Icon(Icons.my_location, color: C.go, size: 22),
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(color: C.go.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: const Icon(Icons.my_location, color: C.go, size: 20),
                 ),
                 const SizedBox(width: 14),
                 const Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Check in to a place', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                     SizedBox(height: 2),
-                    Text("Coworking, café or venue. Meet who's there today.", style: TextStyle(color: C.muted, fontSize: 14)),
+                    Text("Coworking, café or venue. Meet who's there today.",
+                        style: TextStyle(color: C.muted, fontSize: 14, height: 1.35)),
                   ]),
                 ),
                 const Icon(Icons.chevron_right, color: C.muted),
               ]),
             ),
             if (error != null) ErrorNote(error),
-            const SizedBox(height: 30),
-            Row(children: [
-              Expanded(child: Text('Your events', style: displayStyle(28))),
-              SegmentedButton<bool>(
-                showSelectedIcon: false,
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  selectedBackgroundColor: C.soft,
-                  selectedForegroundColor: C.ink,
-                  foregroundColor: C.muted,
-                  side: const BorderSide(color: C.line),
-                ),
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Upcoming')),
-                  ButtonSegment(value: true, label: Text('Past')),
-                ],
-                selected: {past},
-                onSelectionChanged: (v) => setState(() => past = v.first),
+            const SizedBox(height: 32),
+            SectionLabel(
+              'Your events',
+              trailing: GestureDetector(
+                onTap: () => setState(() => past = !past),
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: 'Upcoming', style: TextStyle(color: past ? C.muted : C.ink)),
+                  const TextSpan(text: '  ·  ', style: TextStyle(color: C.muted)),
+                  TextSpan(text: 'Past', style: TextStyle(color: past ? C.ink : C.muted)),
+                ]), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               ),
-            ]),
-            const SizedBox(height: 12),
+            ),
             if (shown == null && error == null)
               const Padding(padding: EdgeInsets.all(24), child: Loading())
             else if ((shown ?? []).isEmpty)
@@ -164,9 +219,8 @@ class _EventsTabState extends State<EventsTab> {
               )
             else
               for (final e in shown!) _EventRow(id: e.id, name: e.name, place: e.place, start: e.startsAt, end: e.endsAt, place2: e.kind == 'place'),
-            const SizedBox(height: 30),
-            Text('All events', style: displayStyle(28)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 28),
+            const SectionLabel('All events'),
             if (others == null && error == null)
               const Padding(padding: EdgeInsets.all(24), child: Loading())
             else if ((others ?? []).isEmpty)
@@ -215,32 +269,36 @@ class _EventRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phase = eventPhase(start, end);
-    final when = place2 ? 'Check-ins today' : eventWhen(start, end);
+    final live = !place2 && eventPhase(start, end) == EventPhase.live;
+    final sub = [if (place2) 'Check-in' else place, if (!place2 && !live) eventWhen(start, end)]
+        .where((x) => x.isNotEmpty)
+        .join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: SurfaceCard(
+        padding: const EdgeInsets.fromLTRB(18, 14, 12, 14),
         onTap: () => context.push('/e/$id'),
         child: Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                if (phase == EventPhase.live && !place2) ...[
+                if (place2) ...[
+                  const Icon(Icons.my_location, color: C.go, size: 14),
+                  const SizedBox(width: 7),
+                ] else if (live) ...[
                   Container(width: 7, height: 7, decoration: const BoxDecoration(color: C.go, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  const Text('LIVE', style: eyebrow),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 7),
                 ],
                 Flexible(
-                  child: Text(when.isEmpty ? 'No date' : when,
-                      overflow: TextOverflow.ellipsis, style: const TextStyle(color: C.muted, fontSize: 13)),
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
                 ),
               ]),
-              const SizedBox(height: 6),
-              Text(name, style: displayStyle(24)),
-              if (place.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(place, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: C.muted, fontSize: 14)),
+              if (sub.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: C.muted, fontSize: 14)),
               ],
             ]),
           ),
@@ -262,8 +320,8 @@ class MeTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
-          const Text('YOU', style: eyebrow),
-          const SizedBox(height: 18),
+          const Align(alignment: Alignment.centerLeft, child: Wordmark()),
+          const SizedBox(height: 28),
           Row(children: [
             Avatar(name: p?.displayName ?? '', url: p?.photoURL ?? '', size: 72),
             const SizedBox(width: 16),
@@ -300,7 +358,9 @@ class MeTab extends StatelessWidget {
                   reason: 'Keep your profile and check-ins, and connect with people. Guests can’t swipe.'),
               child: const Text('Sign in with Google'),
             ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
+          const SidekickStatusCard(),
+          const SizedBox(height: 20),
           const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,

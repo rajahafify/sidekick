@@ -248,3 +248,23 @@ describe('accounts', () => {
     expect((await s.call(alice, 'GET', `/events/${id}`)).body.people).toEqual([]);
   });
 });
+
+describe('sidekick status', () => {
+  it('reports no model when none is set up', async () => {
+    const s = setup();
+    const r = await s.call(guest, 'POST', '/status/check');
+    expect(r.body).toMatchObject({ ok: false, model: null });
+  });
+
+  it('pings the model and remembers the last result', async () => {
+    let reply: string | null = 'OK';
+    const s = setup({ model: async () => ({ text: reply, error: reply ? undefined : 'OpenRouter 429: busy' }), modelName: 'test-model' });
+    const ok = await s.call(alice, 'POST', '/status/check');
+    expect(ok.body).toMatchObject({ ok: true, model: 'test-model', reply: 'OK', error: null });
+    expect((await s.call(alice, 'GET', '/status')).body).toMatchObject({ model: 'test-model', lastOk: expect.any(String), lastError: null });
+    reply = null;
+    const bad = await s.call(alice, 'POST', '/status/check');
+    expect(bad.body).toMatchObject({ ok: false, error: 'OpenRouter 429: busy' });
+    expect((await s.call(alice, 'GET', '/status')).body.lastError).toMatchObject({ error: 'OpenRouter 429: busy' });
+  });
+});

@@ -29,7 +29,7 @@ function pickModel(): Model | null {
 const app = new App({
   store: new DynamoStore(env.TABLE_NAME!),
   model: pickModel(),
-  modelName: env.MODEL_ID,
+  modelName: env.MODEL_ID ? `${env.LLM_PROVIDER === 'openrouter' ? 'OpenRouter' : 'Bedrock'} ${env.MODEL_ID}` : undefined,
   places: env.PLACES === 'off' ? null : locationPlaces(env.AWS_REGION!, (env.PLACES_COUNTRIES ?? '').split(',').filter(Boolean)),
   fetch,
   now: () => Date.now(),

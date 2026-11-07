@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
 import '../data/api.dart';
@@ -169,26 +170,38 @@ class _EventScreenState extends State<EventScreen> {
   void _celebrate(String uid) {
     final p = room?.people.where((x) => x.uid == uid).firstOrNull;
     if (p == null) return;
-    showDialog(
+    final mine = room?.me;
+    showModalBottomSheet<void>(
       context: context,
-      builder: (c) => Dialog(
-        backgroundColor: C.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      backgroundColor: C.surface,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(26),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('QUEST ACCEPTED', style: eyebrow),
-              const SizedBox(height: 16),
-              Avatar(name: p.displayName, url: p.photoURL, size: 84),
-              const SizedBox(height: 16),
-              Text("It's a match", style: displayStyle(38)),
+              const Text("IT'S A MATCH", textAlign: TextAlign.center, style: eyebrow),
+              const SizedBox(height: 18),
+              Center(
+                child: SizedBox(
+                  width: 128,
+                  height: 72,
+                  child: Stack(children: [
+                    if (mine != null) Positioned(left: 0, child: Avatar(name: mine.displayName, url: mine.photoURL, size: 72)),
+                    Positioned(right: 0, child: Avatar(name: p.displayName, url: p.photoURL, size: 72)),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('You and ${firstName(p.displayName)} both want to connect',
+                  textAlign: TextAlign.center, style: displayStyle(30)),
               const SizedBox(height: 8),
-              Text(
-                'You and ${firstName(p.displayName)} both want to meet. Your contacts are swapped.',
+              const Text(
+                'Your contacts are swapped, and your sidekick wrote an opener for the break.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: C.muted, fontSize: 15),
+                style: TextStyle(color: C.muted, fontSize: 15, height: 1.4),
               ),
               const SizedBox(height: 22),
               FilledButton(
@@ -196,11 +209,12 @@ class _EventScreenState extends State<EventScreen> {
                   Navigator.pop(c);
                   context.push('/e/${widget.id}/m/${Uri.encodeComponent(uid)}');
                 },
-                child: const Text('See the intro'),
+                child: const Text('See contact and opener'),
               ),
+              const SizedBox(height: 6),
               TextButton(
                 onPressed: () => Navigator.pop(c),
-                child: const Text('Keep swiping', style: TextStyle(color: C.muted)),
+                child: const Text('Keep scouting', style: TextStyle(color: C.muted)),
               ),
             ],
           ),
@@ -325,19 +339,33 @@ class _EventScreenState extends State<EventScreen> {
     final phase = eventPhase(e.startsAt, e.endsAt);
     final when = e.isPlace
         ? 'CHECK-INS · ${e.startsAt == null ? 'TODAY' : eventWhen(e.startsAt, null).split(',').take(2).join(',').toUpperCase()}'
+        : phase == EventPhase.live
+        ? 'HAPPENING NOW'
         : [
             eventWhen(e.startsAt, e.endsAt).toUpperCase(),
-            if (phase == EventPhase.live) 'HAPPENING NOW',
             if (phase == EventPhase.ended) 'ENDED',
           ].where((s) => s.isNotEmpty).join(' · ');
 
     return Scaffold(
       appBar: AppBar(
-        // Opened from a link: there's nothing to go back to, so offer home.
-        leading: context.canPop()
-            ? null
-            : IconButton(onPressed: () => context.go('/'), icon: const Icon(Icons.home_outlined)),
-        actions: [IconButton(onPressed: _menu, icon: const Icon(Icons.more_horiz))],
+        // Opened from a link: there's nothing to go back to, so the wordmark goes home.
+        automaticallyImplyLeading: false,
+        leadingWidth: 110,
+        // Opened from a link: there's nothing to go back to, so Back goes home.
+        leading: TextButton.icon(
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: C.ink),
+          label: const Text('Back', style: TextStyle(color: C.ink, fontSize: 17, fontWeight: FontWeight.w400)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _shareSheet,
+            child: const Text('Share', style: TextStyle(color: C.go, fontSize: 17, fontWeight: FontWeight.w400)),
+          ),
+          if (r.checkedIn) IconButton(onPressed: _menu, icon: const Icon(Icons.more_horiz, color: C.muted)),
+          const SizedBox(width: 8),
+        ],
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1)),
       ),
       body: RefreshIndicator(
         color: C.go,
@@ -346,14 +374,29 @@ class _EventScreenState extends State<EventScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
           children: [
-            Text(when.isEmpty ? 'HAPPENING NOW' : when, style: eyebrow),
+            const SizedBox(height: 16),
+            Text(when.isEmpty ? 'HAPPENING NOW' : when, style: eyebrow.copyWith(letterSpacing: 2.2)),
             const SizedBox(height: 10),
             Text(e.name, style: displayStyle(42)),
-            if (e.place.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(e.place, style: const TextStyle(color: C.muted, fontSize: 15)),
-            ],
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            if (e.place.isNotEmpty)
+              GestureDetector(
+                onTap: () => launchUrl(
+                  Uri.https('www.google.com', '/maps/search/', {'api': '1', 'query': e.place}),
+                  mode: LaunchMode.externalApplication,
+                ),
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: '${e.place} '),
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Icon(Icons.north_east_rounded, size: 15, color: C.muted),
+                    ),
+                  ]),
+                  style: const TextStyle(color: C.muted, fontSize: 16),
+                ),
+              ),
+            const SizedBox(height: 4),
             Text('${r.count} checked in', style: const TextStyle(color: C.muted, fontSize: 14)),
             const SizedBox(height: 22),
             if (!r.checkedIn) ..._joinSection(r, phase) else ..._roomSection(r),
@@ -382,7 +425,7 @@ class _EventScreenState extends State<EventScreen> {
           const SizedBox(height: 18),
           FilledButton(
             onPressed: busy || phase == EventPhase.ended ? null : _join,
-            child: busy ? const ButtonProgress() : Text(r.event.isPlace ? 'Check in here' : 'Check in'),
+            child: busy ? const ButtonProgress() : Text(r.event.isPlace ? 'Check in here' : "I'm at this event"),
           ),
         ],
       ),
@@ -408,20 +451,41 @@ class _EventScreenState extends State<EventScreen> {
     final myMatches = r.matches.map((u) => byId[u]).whereType<Attendee>().toList();
 
     return [
-      SegmentedButton<int>(
-        showSelectedIcon: false,
-        style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: C.soft,
-          selectedForegroundColor: C.ink,
-          foregroundColor: C.muted,
-          side: const BorderSide(color: C.line),
-        ),
-        segments: [
-          const ButtonSegment(value: 0, label: Text('Your picks')),
-          ButtonSegment(value: 1, label: Text(myMatches.isEmpty ? 'Matches' : 'Matches · ${myMatches.length}')),
-        ],
-        selected: {tab},
-        onSelectionChanged: (v) => setState(() => tab = v.first),
+      SurfaceCard(
+        padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
+        child: Row(children: [
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Visible to others', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              SizedBox(height: 2),
+              Text("Other people's sidekicks can suggest you.", style: TextStyle(color: C.muted, fontSize: 14)),
+            ]),
+          ),
+          Switch(
+            value: me.visible,
+            activeTrackColor: C.go,
+            activeThumbColor: C.ink,
+            onChanged: busy
+                ? null
+                : (v) => _run(() async {
+                      await api.setVisible(widget.id, v);
+                      await _load();
+                    }),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 18),
+      Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.line)),
+        child: Row(children: [
+          _TabLabel(text: deck.isEmpty ? 'Scouted' : 'Scouted · ${deck.length}', on: tab == 0, onTap: () => setState(() => tab = 0)),
+          _TabLabel(
+            text: myMatches.isEmpty ? 'Matches' : 'Matches · ${myMatches.length}',
+            on: tab == 1,
+            onTap: () => setState(() => tab = 1),
+          ),
+        ]),
       ),
       const SizedBox(height: 18),
       if (tab == 0) ...[
@@ -429,7 +493,7 @@ class _EventScreenState extends State<EventScreen> {
           const Padding(
             padding: EdgeInsets.only(bottom: 14),
             child: Text(
-              "You're hidden from new people. Turn it back on from the ⋯ menu.",
+              "You're hidden from new people. Matches you already have stay.",
               style: TextStyle(color: C.muted),
             ),
           ),
@@ -466,9 +530,9 @@ class _EventScreenState extends State<EventScreen> {
             canSwipe: (like) => _canSwipe(deck.first.person, like),
             onSwipe: (like) => _swipe(deck.first.person, like),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Text(
-            '${deck.length} to go',
+            '${deck.length - 1} more lined up',
             textAlign: TextAlign.center,
             style: const TextStyle(color: C.muted, fontSize: 13),
           ),
@@ -597,197 +661,210 @@ class _DeckState extends State<_Deck> with SingleTickerProviderStateMixin {
     final theyHelp = overlap(widget.me.lookingFor, p.offering).toSet();
     final iHelp = overlap(p.lookingFor, widget.me.offering).toSet();
 
-    return Column(
-      children: [
-        GestureDetector(
-          onPanUpdate: (d) => setState(() => drag += d.delta),
-          onPanEnd: (d) {
-            final v = d.velocity.pixelsPerSecond.dx;
-            if (drag.dx > width * 0.28 || v > 900) {
-              _go(true);
-            } else if (drag.dx < -width * 0.28 || v < -900) {
-              _go(false);
-            } else {
-              _back();
-            }
-          },
-          child: Transform.translate(
-            offset: drag,
-            child: Transform.rotate(
-              angle: t * math.pi / 28,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: C.paper,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: t > 0.15
-                        ? C.go.withValues(alpha: t)
-                        : t < -0.15
-                        ? C.muted.withValues(alpha: -t)
-                        : C.line,
-                    width: 1.5,
-                  ),
-                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 14))],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 340,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          p.photoURL.isNotEmpty
-                              ? ShaderMask(
-                                  shaderCallback: (r) => const LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [Colors.white, Colors.white, Colors.transparent],
-                                    stops: [0, 0.55, 1],
-                                  ).createShader(r),
-                                  blendMode: BlendMode.dstIn,
-                                  child: ColorFiltered(
-                                    colorFilter: grayscale,
-                                    child: Image.network(
-                                      p.photoURL,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => const SizedBox(),
-                                    ),
-                                  ),
-                                )
-                              : Dots(portraitField(p.uid, headY: 0.3, scale: 0.78), step: 7, fade: (0.45, 0.72)),
-                          Positioned(
-                            left: 22,
-                            right: 22,
-                            bottom: 16,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const SidekickMark(size: 13, mood: BuddyMood.wink),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'SIDEKICK PICK · ${_fit.toUpperCase()}',
-                                      style: eyebrow.copyWith(fontSize: 11),
-                                    ),
-                                    if (widget.scouting) ...[
-                                      const SizedBox(width: 8),
-                                      const SizedBox(
-                                        width: 10,
-                                        height: 10,
-                                        child: CircularProgressIndicator(strokeWidth: 1.5, color: C.go),
-                                      ),
-                                    ],
-                                    const Spacer(),
-                                    if (t.abs() > 0.15)
-                                      Text(
-                                        t > 0 ? 'CONNECT' : 'PASS',
-                                        style: eyebrow.copyWith(color: t > 0 ? C.go : C.muted, fontSize: 14),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(p.displayName, style: displayStyle(48)),
-                              ],
+    final initials = p.displayName.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join();
+    Widget label(String t) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(t, style: const TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.6)),
+        );
+
+    return GestureDetector(
+      onPanUpdate: (d) => setState(() => drag += d.delta),
+      onPanEnd: (d) {
+        final v = d.velocity.pixelsPerSecond.dx;
+        if (drag.dx > width * 0.28 || v > 900) {
+          _go(true);
+        } else if (drag.dx < -width * 0.28 || v < -900) {
+          _go(false);
+        } else {
+          _back();
+        }
+      },
+      child: Transform.translate(
+        offset: drag,
+        child: Transform.rotate(
+          angle: t * math.pi / 28,
+          child: Container(
+            decoration: BoxDecoration(
+              color: C.surface,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: t > 0.15
+                    ? C.go.withValues(alpha: t)
+                    : t < -0.15
+                    ? C.muted.withValues(alpha: -t)
+                    : C.line,
+                width: 1.2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  height: 400,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (p.photoURL.isNotEmpty)
+                        ShaderMask(
+                          shaderCallback: (r) => const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.white, Colors.white, Colors.transparent],
+                            stops: [0, 0.5, 1],
+                          ).createShader(r),
+                          blendMode: BlendMode.dstIn,
+                          child: Image.network(p.photoURL, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox()),
+                        )
+                      else
+                        DecoratedBox(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xFF1E1410), C.surface],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (p.headline.isNotEmpty) ...[
-                            Text(p.headline, style: const TextStyle(color: C.muted, fontSize: 16)),
-                            const SizedBox(height: 14),
-                          ],
-                          Text(widget.pick.reason, style: const TextStyle(fontSize: 16, height: 1.45)),
-                          if (p.offering.isNotEmpty) ...[
-                            const SizedBox(height: 18),
-                            const Text('Can offer', style: TextStyle(color: C.muted, fontSize: 13)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [for (final x in p.offering) Tag(x, highlight: theyHelp.contains(x))],
+                          child: Align(
+                            alignment: const Alignment(0, -0.2),
+                            child: Text(
+                              initials,
+                              style: displayStyle(150, color: C.go.withValues(alpha: 0.22), style: FontStyle.italic),
                             ),
-                          ],
-                          if (p.lookingFor.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            const Text('Looking for', style: TextStyle(color: C.muted, fontSize: 13)),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [for (final x in p.lookingFor) Tag(x, highlight: iHelp.contains(x))],
-                            ),
-                          ],
-                          if (p.about.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            Text(p.about, style: const TextStyle(fontSize: 15, height: 1.4)),
-                          ],
-                        ],
+                          ),
+                        ),
+                      Positioned(
+                        left: 18,
+                        top: 18,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(color: C.line),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(_fit.toUpperCase(), style: eyebrow.copyWith(fontSize: 11)),
+                            if (widget.scouting) ...[
+                              const SizedBox(width: 8),
+                              const SizedBox(
+                                width: 10,
+                                height: 10,
+                                child: CircularProgressIndicator(strokeWidth: 1.5, color: C.go),
+                              ),
+                            ],
+                          ]),
+                        ),
                       ),
-                    ),
-                  ],
+                      if (t.abs() > 0.15)
+                        Positioned(
+                          right: 20,
+                          top: 22,
+                          child: Text(
+                            t > 0 ? 'CONNECT' : 'PASS',
+                            style: eyebrow.copyWith(color: t > 0 ? C.go : C.muted, fontSize: 14),
+                          ),
+                        ),
+                      Positioned(
+                        left: 22,
+                        right: 22,
+                        bottom: 18,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.displayName, style: displayStyle(40)),
+                            if (p.headline.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(p.headline, style: const TextStyle(color: C.ink, fontSize: 16)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                Container(
+                  color: const Color(0xFF0B0B0B),
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.only(left: 16),
+                        decoration: const BoxDecoration(border: Border(left: BorderSide(color: C.go, width: 2))),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            const SidekickMark(size: 12, mood: BuddyMood.wink),
+                            const SizedBox(width: 7),
+                            Text('YOUR SIDEKICK · QUICK READ', style: eyebrow.copyWith(fontSize: 11)),
+                          ]),
+                          const SizedBox(height: 8),
+                          Text(widget.pick.reason, style: const TextStyle(fontSize: 16, height: 1.45)),
+                        ]),
+                      ),
+                      if (p.about.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(p.about, style: const TextStyle(color: C.muted, fontSize: 15, height: 1.45)),
+                      ],
+                      if (p.lookingFor.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        label('LOOKING FOR'),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [for (final x in p.lookingFor) Tag(x, highlight: iHelp.contains(x))],
+                        ),
+                      ],
+                      if (p.offering.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        label('CAN OFFER'),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [for (final x in p.offering) Tag(x, highlight: theyHelp.contains(x))],
+                        ),
+                      ],
+                      const SizedBox(height: 22),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(backgroundColor: C.soft),
+                            onPressed: () => _go(false),
+                            child: const Text('Pass'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: FilledButton(onPressed: () => _go(true), child: const Text('Connect'))),
+                      ]),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _RoundButton(
-              label: 'Pass',
-              onTap: () => _go(false),
-              color: C.soft,
-              child: const Icon(Icons.close_rounded, color: C.ink, size: 28),
-            ),
-            const SizedBox(width: 28),
-            _RoundButton(
-              label: 'Connect',
-              onTap: () => _go(true),
-              color: C.go,
-              child: const SidekickMark(size: 30, color: C.onInk, features: C.go, cheeks: C.ink),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.label, required this.onTap, required this.color, required this.child});
-  final String label;
+class _TabLabel extends StatelessWidget {
+  const _TabLabel({required this.text, required this.on, required this.onTap});
+  final String text;
+  final bool on;
   final VoidCallback onTap;
-  final Color color;
-  final Widget child;
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Semantics(
-        button: true,
-        label: label,
-        child: Material(
-          color: color,
-          shape: CircleBorder(side: BorderSide(color: color == C.soft ? C.line : color)),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(width: 72, height: 72, child: Center(child: child)),
+  Widget build(BuildContext context) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: on ? C.soft : Colors.transparent, borderRadius: BorderRadius.circular(10)),
+            child: Text(text, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: on ? C.ink : C.muted)),
           ),
         ),
-      ),
-      const SizedBox(height: 8),
-      Text(label, style: const TextStyle(color: C.muted, fontSize: 13)),
-    ],
-  );
+      );
 }

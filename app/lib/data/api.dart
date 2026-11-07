@@ -100,6 +100,14 @@ class Api {
 
   Future<void> deleteAccount() => _send('DELETE', '/me');
 
+  // ---------- Sidekick status ----------
+
+  /// Which model the sidekick runs on, and how its last real call went.
+  Future<Map<String, dynamic>> status() => _send('GET', '/status');
+
+  /// Asks the model a tiny question right now: {ok, model, ms, reply, error}.
+  Future<Map<String, dynamic>> checkSidekick() => _send('POST', '/status/check');
+
   // ---------- Events ----------
 
   Future<({List<MyEvent> mine, List<EventDoc> open})> events() async {
