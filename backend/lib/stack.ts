@@ -84,14 +84,23 @@ export class SidekickStack extends Stack {
     // ---------- Identity: guests, and Google sign-in ----------
     // A guest gets an unauthenticated identity. Signing in with Google later links Google to that
     // same identity, so the guest's profile and check-ins carry over.
+    // The Android app's Google tokens name the Android client as their authorized party (azp), and
+    // Cognito checks that. The built-in Google provider takes one client id (max 128 chars), so with
+    // an Android client Google becomes an OpenID Connect provider that trusts both. The app still
+    // signs in with the login key 'accounts.google.com' either way.
+    const googleOidc = props.googleAndroidClientId
+      ? new iam.CfnOIDCProvider(this, 'GoogleOidc', {
+          url: 'https://accounts.google.com',
+          clientIdList: [props.googleClientId, props.googleAndroidClientId],
+        })
+      : undefined;
     const pool = new cognito.CfnIdentityPool(this, 'Identities', {
       identityPoolName: 'sidekick',
       allowUnauthenticatedIdentities: true,
       allowClassicFlow: false,
-      // Google accepts a comma-separated list: the web client, plus the Android client for the app.
-      supportedLoginProviders: {
-        'accounts.google.com': [props.googleClientId, props.googleAndroidClientId].filter(Boolean).join(','),
-      },
+      ...(googleOidc
+        ? { openIdConnectProviderArns: [googleOidc.attrArn] }
+        : { supportedLoginProviders: { 'accounts.google.com': props.googleClientId } }),
     });
 
     // ---------- API ----------
