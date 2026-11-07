@@ -707,7 +707,7 @@ export class App {
     const started = Date.now();
     const r = await this.d.model(
       { system: 'You are a health check. Reply with the single word OK.', user: 'Are you there?' },
-      { maxTokens: 16, temperature: 0 },
+      { maxTokens: 300, temperature: 0 },
     );
     return {
       ok: !!r.text,

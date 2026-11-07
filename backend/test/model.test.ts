@@ -12,7 +12,8 @@ describe('openRouterModel', () => {
       return new Response(JSON.stringify({ choices: [{ message: { content: ' Hello there ' } }] }));
     }) as unknown as typeof fetch;
     const r = await openRouterModel('openrouter/free', async () => 'k', fake)(prompt, opts);
-    expect(r).toEqual({ text: 'Hello there', error: undefined });
+    expect(r).toEqual({ text: 'Hello there' });
+    expect(sent.body.reasoning).toEqual({ effort: 'low', exclude: true });
     expect(sent.url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(sent.init.headers.authorization).toBe('Bearer k');
     expect(sent.body.model).toBe('openrouter/free');
@@ -28,5 +29,14 @@ describe('openRouterModel', () => {
     const r = await openRouterModel('m', async () => 'k', limited)(prompt, opts);
     expect(r.text).toBeNull();
     expect(r.error).toContain('429');
+  });
+
+  it('says which model gave an empty reply and why', async () => {
+    const empty = (async () =>
+      new Response(
+        JSON.stringify({ model: 'some/thinker:free', choices: [{ message: { content: '' }, finish_reason: 'length' }] }),
+      )) as unknown as typeof fetch;
+    const r = await openRouterModel('openrouter/free', async () => 'k', empty)(prompt, opts);
+    expect(r).toEqual({ text: null, error: 'Empty reply (some/thinker:free, finish_reason length)' });
   });
 });
