@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.artifisi.sidekick",
+      "sha256_cert_fingerprints": [
+        "BF:15:92:E1:33:32:DD:1B:F3:AA:C9:89:B6:C8:89:91:91:EC:FD:6C:C0:82:91:E4:CD:5A:84:A7:CD:94:51:48"
+      ]
+    }
+  }
+]
