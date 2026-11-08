@@ -429,6 +429,84 @@ describe('alerts and messages', () => {
   });
 });
 
+describe('connections', () => {
+  // Both people Connect, which makes a match in that event.
+  const connectAt = async (s: ReturnType<typeof setup>, id: string, a: Identity, b: Identity) => {
+    await s.call(a, 'POST', `/events/${id}/swipe`, { to: b.id, like: true });
+    return (await s.call(b, 'POST', `/events/${id}/swipe`, { to: a.id, like: true })).body.match;
+  };
+
+  it('lists who I connected with, with contact details, and nobody else', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob, carol]);
+    expect(await connectAt(s, id, alice, bob)).toBe(true);
+
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([
+      expect.objectContaining({
+        uid: bob.id,
+        displayName: 'bob',
+        eventId: id,
+        eventName: 'Founders night',
+        contact: expect.objectContaining({ linkedin: 'linkedin.com/in/bob' }),
+      }),
+    ]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items.map((c: any) => c.uid)).toEqual([alice.id]);
+    expect((await s.call(carol, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('carries over to a later event, where that person is shown as connected and not suggested', async () => {
+    const s = setup();
+    const first = await room(s, [alice, bob]);
+    await connectAt(s, first, alice, bob);
+
+    const second = await room(s, [alice, bob, carol]);
+    const view = (await s.call(alice, 'GET', `/events/${second}`)).body;
+    expect(view.connected).toEqual([expect.objectContaining({ uid: bob.id, eventId: first })]);
+    expect(view.people.map((p: any) => p.uid).sort()).toEqual([bob.id, carol.id].sort());
+    const picks = (await s.call(alice, 'POST', `/events/${second}/scout`)).body.picks;
+    expect(picks.map((p: any) => p.uid)).toEqual([carol.id]);
+  });
+
+  it('is left out for people who have blocked me, or whom I have blocked', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob]);
+    await connectAt(s, id, alice, bob);
+    await s.call(bob, 'POST', '/block', { uid: alice.id });
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('forgets a connection when the event it was made at is deleted, but keeps one from a later event', async () => {
+    const s = setup({ adminIds: [alice.id] });
+    const first = await room(s, [alice, bob]);
+    await connectAt(s, first, alice, bob);
+    const second = await room(s, [alice, bob]);
+    await connectAt(s, second, alice, bob);
+
+    await s.call(alice, 'DELETE', `/admin/events/${first}`);
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([
+      expect.objectContaining({ uid: bob.id, eventId: second }),
+    ]);
+
+    await s.call(alice, 'DELETE', `/admin/events/${second}`);
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('goes on both sides when someone deletes their account', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob]);
+    await connectAt(s, id, alice, bob);
+    await s.call(bob, 'DELETE', '/me');
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('is only for people who are signed in', async () => {
+    const s = setup();
+    expect((await s.call(guest, 'GET', '/connections')).status).toBe(403);
+  });
+});
+
 describe('profile photos', () => {
   const photoBaseUrl = 'https://photos.example.test';
   const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0]).toString('base64');

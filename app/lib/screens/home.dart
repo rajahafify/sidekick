@@ -15,7 +15,7 @@ import '../widgets/ui.dart';
 import 'check_in.dart';
 import 'inbox.dart';
 
-/// Events, Messages, Alerts and You, with the raised + in the middle (add an event, or check in to
+/// Events, Connected, Messages, Alerts and You, with the raised + in the middle (add an event, or check in to
 /// a place). The place check-in is tab 2; the + sheet opens it, so the bar doesn't show it.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.tab});
@@ -68,7 +68,7 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) => Scaffold(
         body: IndexedStack(
           index: widget.tab,
-          children: const [EventsTab(), MessagesTab(), CheckInView(), AlertsTab(), MeTab()],
+          children: const [EventsTab(), MessagesTab(), CheckInView(), AlertsTab(), MeTab(), ConnectedTab()],
         ),
         bottomNavigationBar: _TabBar(
           tab: widget.tab,
@@ -111,7 +111,11 @@ class _TabBar extends StatelessWidget {
                 ),
             ]),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(fontSize: 12, color: on ? C.go : C.muted, fontWeight: FontWeight.w500)),
+            // Five tabs share a narrow phone bar, so a long label shrinks rather than wrapping.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label, style: TextStyle(fontSize: 12, color: on ? C.go : C.muted, fontWeight: FontWeight.w500)),
+            ),
           ]),
         ),
       );
@@ -126,8 +130,9 @@ class _TabBar extends StatelessWidget {
           child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
             Row(children: [
               item(0, Icons.calendar_today_outlined, Icons.calendar_today, 'Events', '/'),
+              item(5, Icons.people_outline, Icons.people, 'Connected', '/connected'),
               item(1, Icons.chat_bubble_outline, Icons.chat_bubble, 'Messages', '/messages', badge: messages),
-              const SizedBox(width: 88),
+              const SizedBox(width: 72),
               item(3, Icons.notifications_none, Icons.notifications, 'Alerts', '/alerts', badge: alerts),
               item(4, Icons.person_outline, Icons.person, 'You', '/me'),
             ]),

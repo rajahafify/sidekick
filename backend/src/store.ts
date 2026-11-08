@@ -10,6 +10,7 @@
 //   EVENT#<id>       MATCH#<a>#<b>         a mutual Connect (a < b)
 //   EVENT#<id>       EXCHANGE#<a>#<b>      the agents' conversation for a match, kept for good
 //   USER#<id>        NOTE#<eventId>#<uid>  my latest news with one match: alerts and the message list
+//   USER#<id>        CONN#<otherId>        someone I've connected with, across events (the event we last met at)
 //   CHAT#<eventId>#<a>#<b>  MSG#<iso>#<id> a message between two matched people
 //   QUOTA#<key>      QUOTA                 counts model calls; expires with ttl
 //   CACHE#<key>      CACHE                 cached model answers (scouting rankings); expire with ttl

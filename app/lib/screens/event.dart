@@ -426,12 +426,16 @@ class _EventScreenState extends State<EventScreen> {
     final me = r.me!;
     final swipes = {...r.swipes, ..._optimistic};
     final matched = r.matches.toSet();
+    final known = {for (final p in r.connected) p.uid};
     final picks = {for (final p in scout?.picks ?? const <ScoutPick>[]) p.uid: p};
     final byId = {for (final p in r.people) p.uid: p};
     final deck =
         r.people
             .where(
-              (p) => !matched.contains(p.uid) && (!swipes.containsKey(p.uid) || (showPassed && swipes[p.uid] == false)),
+              (p) =>
+                  !matched.contains(p.uid) &&
+                  !known.contains(p.uid) &&
+                  (!swipes.containsKey(p.uid) || (showPassed && swipes[p.uid] == false)),
             )
             .map((p) => (person: p, pick: picks[p.uid] ?? templatePick(me, p)))
             .toList()
@@ -532,6 +536,24 @@ class _EventScreenState extends State<EventScreen> {
             onPressed: () => setState(() => showPassed = !showPassed),
             child: Text(showPassed ? 'Hide people you passed' : 'Show $passed you passed'),
           ),
+        if (r.connected.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text('ALREADY CONNECTED', style: eyebrow),
+          const SizedBox(height: 6),
+          Text(
+            "You've connected with them before, so there's no need to connect again.",
+            style: TextStyle(color: C.muted, fontSize: 14),
+          ),
+          const SizedBox(height: 14),
+          for (final p in r.connected)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _KnownRow(
+                person: p,
+                onMessage: () => context.push('/chat/${r.connectedEvents[p.uid] ?? widget.id}/${Uri.encodeComponent(p.uid)}'),
+              ),
+            ),
+        ],
       ] else ...[
         if (myMatches.isEmpty)
           const EmptyState(
@@ -572,6 +594,31 @@ class _EventScreenState extends State<EventScreen> {
       ],
     ];
   }
+}
+
+/// Someone here I already connected with. Messaging them goes on in the chat from before.
+class _KnownRow extends StatelessWidget {
+  const _KnownRow({required this.person, required this.onMessage});
+  final Attendee person;
+  final VoidCallback onMessage;
+
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+        onTap: onMessage,
+        child: Row(children: [
+          Avatar(name: person.displayName, url: person.photoURL, size: 46),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              person.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text('Message', style: TextStyle(color: C.go, fontWeight: FontWeight.w600)),
+        ]),
+      );
 }
 
 /// The top card of the deck. Drag right to connect, left to pass, or use the buttons.

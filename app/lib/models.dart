@@ -85,6 +85,50 @@ class NoteList {
       );
 }
 
+/// Someone I connected with, at this event or an earlier one. Their contact details are shown, since we matched.
+class Connection {
+  const Connection({
+    required this.uid,
+    required this.name,
+    this.headline = '',
+    this.photoURL = '',
+    this.contact = const Contact(),
+    required this.eventId,
+    this.eventName = '',
+    this.matchedAt,
+  });
+
+  final String uid;
+  final String name;
+  final String headline;
+  final String photoURL;
+  final Contact contact;
+
+  /// The event where we last connected. Our chat is kept there.
+  final String eventId;
+  final String eventName;
+  final DateTime? matchedAt;
+
+  factory Connection.fromMap(Map<String, dynamic> m) => Connection(
+        uid: '${m['uid'] ?? ''}',
+        name: '${m['displayName'] ?? ''}',
+        headline: '${m['headline'] ?? ''}',
+        photoURL: '${m['photoURL'] ?? ''}',
+        contact: Contact.fromMap(_map(m['contact'])),
+        eventId: '${m['eventId'] ?? ''}',
+        eventName: '${m['eventName'] ?? ''}',
+        matchedAt: _date(m['matchedAt']),
+      );
+}
+
+class ConnectionList {
+  const ConnectionList({required this.items});
+  final List<Connection> items;
+
+  factory ConnectionList.fromMap(Map<String, dynamic> m) =>
+      ConnectionList(items: ((m['items'] as List?) ?? const []).map((e) => Connection.fromMap(_map(e))).toList());
+}
+
 class ChatMessage {
   const ChatMessage({required this.id, required this.mine, required this.text, this.at});
   final String id;
@@ -311,6 +355,8 @@ class Room {
     this.me,
     this.count = 0,
     this.people = const [],
+    this.connected = const [],
+    this.connectedEvents = const {},
     this.swipes = const {},
     this.matches = const [],
   });
@@ -320,6 +366,12 @@ class Room {
   final Attendee? me;
   final int count;
   final List<Attendee> people;
+
+  /// People here I've already connected with. The deck skips them; they're listed apart.
+  final List<Attendee> connected;
+
+  /// The event where I last connected with each of them, so I can message them there.
+  final Map<String, String> connectedEvents;
   final Map<String, bool> swipes;
   final List<String> matches;
 
@@ -331,6 +383,10 @@ class Room {
         me: m['me'] is Map ? Attendee.fromMap(_map(m['me'])) : null,
         count: (m['count'] as num?)?.toInt() ?? 0,
         people: ((m['people'] as List?) ?? []).map((p) => Attendee.fromMap(_map(p))).toList(),
+        connected: ((m['connected'] as List?) ?? []).map((p) => Attendee.fromMap(_map(p))).toList(),
+        connectedEvents: {
+          for (final p in (m['connected'] as List?) ?? const []) '${_map(p)['uid']}': '${_map(p)['eventId']}',
+        },
         swipes: _map(m['swipes']).map((k, v) => MapEntry(k, v == true)),
         matches: ((m['matches'] as List?) ?? []).map((x) => '${_map(x)['uid']}').toList(),
       );

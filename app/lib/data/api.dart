@@ -179,6 +179,9 @@ class Api {
   /// My conversations, newest first, and how many have messages I haven't read.
   Future<NoteList> chats() async => NoteList.fromMap(await _send('GET', '/chats'));
 
+  /// Everyone I've connected with, across events, with their contact details.
+  Future<ConnectionList> connections() async => ConnectionList.fromMap(await _send('GET', '/connections'));
+
   /// One conversation with a match. Opening it marks it read.
   Future<ChatThread> chat(String eventId, String uid) async => ChatThread.fromMap(
       await _send('GET', '/chats/${Uri.encodeComponent(eventId)}/${Uri.encodeComponent(uid)}'));

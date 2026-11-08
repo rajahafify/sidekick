@@ -201,6 +201,7 @@ GoRouter _router(Session session) => GoRouter(
         GoRoute(path: '/places', builder: (_, _) => const HomeShell(tab: 2)),
         GoRoute(path: '/alerts', builder: (_, _) => const HomeShell(tab: 3)),
         GoRoute(path: '/me', builder: (_, _) => const HomeShell(tab: 4)),
+        GoRoute(path: '/connected', builder: (_, _) => const HomeShell(tab: 5)),
         GoRoute(path: '/checkin', builder: (_, _) => const CheckInScreen()),
         GoRoute(path: '/new', builder: (_, _) => const NewEventScreen()),
         GoRoute(

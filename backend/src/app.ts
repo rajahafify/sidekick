@@ -306,6 +306,7 @@ export class App {
     if (is('GET', 'alerts')) return this.alerts(me);
     if (is('POST', 'alerts', 'read')) return this.readAlerts(me);
     if (is('GET', 'chats')) return this.chats(me);
+    if (is('GET', 'connections')) return this.connections(me);
     if (parts[0] === 'chats' && parts.length >= 3) {
       const [eventId, uid] = [parts[1], parts[2]];
       if (!/^[\w-]{1,160}$/.test(eventId) || uid.length > 128) fail(404, 'Not found.');
@@ -504,7 +505,10 @@ export class App {
     if (is('DELETE', 'events', '*')) {
       for (const i of await this.store.query(`EVENT#${id}`, '', 100_000)) {
         if (i.sk.startsWith('ATT#')) await this.store.delete(`USER#${i.sk.slice('ATT#'.length)}`, `EVENT#${id}`);
-        if (i.sk.startsWith('MATCH#')) await this.dropConversation(id, i.users[0], i.users[1]);
+        if (i.sk.startsWith('MATCH#')) {
+          await this.dropConversation(id, i.users[0], i.users[1]);
+          await this.dropConnection(id, i.users[0], i.users[1]);
+        }
         await this.store.delete(i.pk, i.sk);
       }
       return { ok: true };
@@ -530,6 +534,10 @@ export class App {
       for (const m of await this.store.query(`EVENT#${eventId}`, 'MATCH#')) {
         if (m.users.includes(me.id)) await this.dropConversation(eventId, me.id, m.users.find((u: string) => u !== me.id));
       }
+    }
+    // Connections go on both sides, so nobody keeps a listing for someone who has gone.
+    for (const c of mine.filter((i) => i.sk.startsWith('CONN#'))) {
+      await this.store.delete(`USER#${c.sk.slice('CONN#'.length)}`, `CONN#${me.id}`);
     }
     for (const i of mine) await this.store.delete(i.pk, i.sk);
     return { ok: true };
@@ -702,6 +710,7 @@ export class App {
     const mine = cards.find((c) => c.uid === me.id);
     if (!mine) return { event, guest: me.guest, me: null, count: cards.length };
     const others = await this.visibleOthers(me, id, cards);
+    const known = await this.connectionsOf(me.id);
     const swipes: Record<string, boolean> = {};
     for (const s of mySwipes) swipes[s.to] = s.like === true;
     const matches = matchItems
@@ -713,6 +722,8 @@ export class App {
       me: cardOut(mine),
       count: cards.length,
       people: others.map(cardOut),
+      // People here I've already connected with, at this event or an earlier one. The app skips them in the deck.
+      connected: others.filter((c) => known.has(c.uid)).map((c) => ({ ...cardOut(c), eventId: known.get(c.uid)!.eventId })),
       swipes,
       matches,
     };
@@ -723,7 +734,12 @@ export class App {
     const mine = items.find((c) => c.uid === me.id);
     if (!mine) fail(403, 'Join the event first.');
     const meCard = cardOut(mine!);
-    const others = (await this.visibleOthers(me, id, items)).map(cardOut).sort((a, b) => (a.uid < b.uid ? -1 : 1));
+    const known = await this.connectionsOf(me.id);
+    // The sidekick doesn't suggest people I've already connected with: they don't need a second connect.
+    const others = (await this.visibleOthers(me, id, items))
+      .filter((c) => !known.has(c.uid))
+      .map(cardOut)
+      .sort((a, b) => (a.uid < b.uid ? -1 : 1));
     if (!others.length) return { source: 'template', picks: [] };
     const strip = (c: CardOut): Card => ({
       uid: c.uid,
@@ -773,6 +789,7 @@ export class App {
     if (await this.store.create({ pk: `EVENT#${id}`, sk: matchKey(me.id, to), users, createdAt: at })) {
       await this.bumpNote(me.id, id, to, theirs, { kind: 'match', at, matchedAt: at, alertUnread: false });
       await this.bumpNote(to, id, me.id, mine, { kind: 'match', at, matchedAt: at, alertUnread: true });
+      await this.recordConnection(me.id, to, id, at);
     }
     return { match: true };
   }
@@ -920,6 +937,61 @@ export class App {
     for (const m of await this.store.query(chatPk(eventId, a, b), '')) await this.store.delete(m.pk, m.sk);
     await this.store.delete(`USER#${a}`, `NOTE#${eventId}#${b}`);
     await this.store.delete(`USER#${b}`, `NOTE#${eventId}#${a}`);
+  }
+
+  // ---------- Connections ----------
+
+  /** Kept on both sides, across events, so two people who connected needn't connect again. Latest event wins. */
+  private async recordConnection(a: string, b: string, eventId: string, matchedAt: string) {
+    await this.store.put({ pk: `USER#${a}`, sk: `CONN#${b}`, eventId, matchedAt });
+    await this.store.put({ pk: `USER#${b}`, sk: `CONN#${a}`, eventId, matchedAt });
+  }
+
+  /** The people I've connected with, by uid, with the event where we last connected. */
+  private async connectionsOf(uid: string) {
+    const rows = await this.store.query(`USER#${uid}`, 'CONN#');
+    return new Map(rows.map((r) => [r.sk.slice('CONN#'.length), r] as const));
+  }
+
+  /** Everyone I've connected with, across events, with their contact details. Blocked people are left out. */
+  private async connections(me: Identity) {
+    if (me.guest) fail(403, 'Sign in with Google to see your connections.', { needsLogin: true });
+    const [rows, blocked] = await Promise.all([this.store.query(`USER#${me.id}`, 'CONN#'), this.blockedSet(me.id)]);
+    const out: Record<string, any>[] = [];
+    for (const row of rows) {
+      const uid = row.sk.slice('CONN#'.length);
+      if (blocked.has(uid)) continue;
+      if ((await this.store.get(`USER#${uid}`, `BLOCK#${me.id}`)) !== null) continue;
+      const [profile, meta] = await Promise.all([
+        this.store.get(`USER#${uid}`, 'PROFILE'),
+        this.store.get(`EVENT#${row.eventId}`, 'META'),
+      ]);
+      const p = profileOut(profile);
+      if (!p) continue;
+      out.push({
+        uid,
+        displayName: p.displayName,
+        photoURL: p.photoURL,
+        headline: p.headline,
+        contact: p.contact,
+        eventId: row.eventId as string,
+        eventName: (meta?.name as string) ?? '',
+        matchedAt: row.matchedAt as string,
+      });
+    }
+    return { items: out.sort((a, b) => String(b.matchedAt).localeCompare(String(a.matchedAt))) };
+  }
+
+  /** Forgets a connection made at this event, unless the two have connected again at a later one. */
+  private async dropConnection(eventId: string, a: string, b: string) {
+    const pairs: [string, string][] = [
+      [a, b],
+      [b, a],
+    ];
+    for (const [owner, other] of pairs) {
+      const c = await this.store.get(`USER#${owner}`, `CONN#${other}`);
+      if (c?.eventId === eventId) await this.store.delete(`USER#${owner}`, `CONN#${other}`);
+    }
   }
 
   // ---------- Safety ----------

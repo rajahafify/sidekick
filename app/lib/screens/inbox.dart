@@ -34,6 +34,189 @@ class MessagesTab extends StatelessWidget {
   Widget build(BuildContext context) => const _Inbox(alerts: false);
 }
 
+/// The Connected tab: everyone you've connected with, across events, so you needn't connect again.
+class ConnectedTab extends StatefulWidget {
+  const ConnectedTab({super.key});
+  @override
+  State<ConnectedTab> createState() => _ConnectedTabState();
+}
+
+class _ConnectedTabState extends State<ConnectedTab> {
+  ConnectionList? list;
+  String? error;
+  Api? api;
+  bool loading = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = SessionScope.of(context);
+    api = session.api;
+    if (list == null && error == null && !session.guest) _load();
+  }
+
+  Future<void> _load() async {
+    final a = api;
+    if (a == null || loading) return;
+    loading = true;
+    try {
+      final r = await a.connections();
+      if (!mounted) return;
+      setState(() {
+        list = r;
+        error = null;
+      });
+    } on ApiError catch (e) {
+      if (mounted) setState(() => error = e.message);
+    } finally {
+      loading = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = SessionScope.of(context);
+    final items = list?.items ?? const <Connection>[];
+    return SafeArea(
+      child: RefreshIndicator(
+        color: C.go,
+        backgroundColor: C.surface,
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          children: [
+            const Align(alignment: Alignment.centerLeft, child: Wordmark()),
+            const SizedBox(height: 30),
+            Text('Connected', style: displayStyle(44)),
+            const SizedBox(height: 10),
+            Text(
+              'The people you connected with. Reach them here, at any event.',
+              style: TextStyle(color: C.muted, fontSize: 17, height: 1.45),
+            ),
+            const SizedBox(height: 24),
+            if (session.guest)
+              const _SignInPrompt(reason: 'Sign in to see the people you connected with.')
+            else if (error != null)
+              ErrorNote(error)
+            else if (list == null)
+              const Padding(padding: EdgeInsets.all(24), child: Loading())
+            else if (items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Nothing yet. When you connect with someone at an event, they stay here, so you never have to connect again.',
+                  style: TextStyle(color: C.muted),
+                ),
+              )
+            else
+              for (final c in items) _ConnectionRow(connection: c),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConnectionRow extends StatelessWidget {
+  const _ConnectionRow({required this.connection});
+  final Connection connection;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = connection;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SurfaceCard(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: C.surface,
+          showDragHandle: true,
+          builder: (sheet) => _ConnectionSheet(
+            connection: c,
+            onMessage: () {
+              Navigator.of(sheet).pop();
+              context.push('/chat/${c.eventId}/${Uri.encodeComponent(c.uid)}');
+            },
+          ),
+        ),
+        child: Row(children: [
+          Avatar(name: c.name, url: c.photoURL, size: 46),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                c.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                c.eventName.isEmpty ? c.headline : 'Met at ${c.eventName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: C.muted, fontSize: 14),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Text(ago(c.matchedAt), style: TextStyle(color: C.muted, fontSize: 12)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A connection's details: where you met, how to reach them, and a button to message them.
+class _ConnectionSheet extends StatelessWidget {
+  const _ConnectionSheet({required this.connection, required this.onMessage});
+  final Connection connection;
+  final VoidCallback onMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = connection;
+    Widget line(String label, String value) => value.trim().isEmpty
+        ? const SizedBox.shrink()
+        : Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label, style: eyebrow),
+              const SizedBox(height: 4),
+              SelectableText(value, style: const TextStyle(fontSize: 16)),
+            ]),
+          );
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 4, 22, 22),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Avatar(name: c.name, url: c.photoURL, size: 56),
+            const SizedBox(width: 14),
+            Expanded(child: Text(c.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600))),
+          ]),
+          if (c.headline.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(c.headline, style: TextStyle(color: C.muted, fontSize: 15)),
+            ),
+          if (c.eventName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('Met at ${c.eventName}', style: TextStyle(color: C.muted, fontSize: 14)),
+            ),
+          line('LinkedIn', c.contact.linkedin),
+          line('Email', c.contact.email),
+          line('Phone or WhatsApp', c.contact.phone),
+          const SizedBox(height: 22),
+          FilledButton(onPressed: onMessage, child: const Text('Message')),
+        ]),
+      ),
+    );
+  }
+}
+
 class _Inbox extends StatefulWidget {
   const _Inbox({required this.alerts});
   final bool alerts;
