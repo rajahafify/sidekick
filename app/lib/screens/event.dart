@@ -427,6 +427,8 @@ class _EventScreenState extends State<EventScreen> {
     final swipes = {...r.swipes, ..._optimistic};
     final matched = r.matches.toSet();
     final known = {for (final p in r.connected) p.uid};
+    // Someone I matched with in this room is under Matches, not under "connected before".
+    final alreadyHere = r.connected.where((p) => !matched.contains(p.uid)).toList();
     final picks = {for (final p in scout?.picks ?? const <ScoutPick>[]) p.uid: p};
     final byId = {for (final p in r.people) p.uid: p};
     final deck =
@@ -536,7 +538,7 @@ class _EventScreenState extends State<EventScreen> {
             onPressed: () => setState(() => showPassed = !showPassed),
             child: Text(showPassed ? 'Hide people you passed' : 'Show $passed you passed'),
           ),
-        if (r.connected.isNotEmpty) ...[
+        if (alreadyHere.isNotEmpty) ...[
           const SizedBox(height: 24),
           Text('ALREADY CONNECTED', style: eyebrow),
           const SizedBox(height: 6),
@@ -545,7 +547,7 @@ class _EventScreenState extends State<EventScreen> {
             style: TextStyle(color: C.muted, fontSize: 14),
           ),
           const SizedBox(height: 14),
-          for (final p in r.connected)
+          for (final p in alreadyHere)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _KnownRow(
