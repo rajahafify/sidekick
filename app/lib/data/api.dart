@@ -11,6 +11,8 @@ import '../config.dart';
 import '../models.dart';
 import 'identity.dart';
 
+Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : const {};
+
 class ApiError implements Exception {
   ApiError(this.message, {this.status = 0, this.data = const {}});
   final String message;
@@ -19,7 +21,6 @@ class ApiError implements Exception {
 
   bool get needsLogin => data['needsLogin'] == true;
   bool get needsProfile => data['needsProfile'] == true;
-  bool get needsLocation => data['needsLocation'] == true;
 
   @override
   String toString() => message;
@@ -146,8 +147,7 @@ class Api {
 
   Future<Room> room(String id) async => Room.fromMap(await _send('GET', '/events/${Uri.encodeComponent(id)}'));
 
-  Future<void> join(String id, Map<String, dynamic>? fix) =>
-      _send('POST', '/events/${Uri.encodeComponent(id)}/join', {'fix': ?fix});
+  Future<void> join(String id) => _send('POST', '/events/${Uri.encodeComponent(id)}/join', {});
 
   Future<void> leave(String id) => _send('POST', '/events/${Uri.encodeComponent(id)}/leave', {});
 
@@ -167,6 +167,34 @@ class Api {
 
   Future<void> report(String uid, String eventId, String reason) =>
       _send('POST', '/report', {'uid': uid, 'eventId': eventId, 'reason': reason});
+
+  // ---------- Alerts and messages ----------
+
+  /// What's new with my matches, newest first, and how many of it I haven't seen yet.
+  Future<NoteList> alerts() async => NoteList.fromMap(await _send('GET', '/alerts'));
+
+  /// Marks every alert as seen.
+  Future<void> readAlerts() => _send('POST', '/alerts/read', {});
+
+  /// My conversations, newest first, and how many have messages I haven't read.
+  Future<NoteList> chats() async => NoteList.fromMap(await _send('GET', '/chats'));
+
+  /// One conversation with a match. Opening it marks it read.
+  Future<ChatThread> chat(String eventId, String uid) async => ChatThread.fromMap(
+      await _send('GET', '/chats/${Uri.encodeComponent(eventId)}/${Uri.encodeComponent(uid)}'));
+
+  /// Sends a message and returns it as it was saved.
+  Future<ChatMessage> send(String eventId, String uid, String text) async {
+    final j = await _send(
+        'POST', '/chats/${Uri.encodeComponent(eventId)}/${Uri.encodeComponent(uid)}/messages', {'text': text});
+    return ChatMessage.fromMap(_map(j['message']));
+  }
+
+  // ---------- Photos ----------
+
+  /// Uploads a JPEG, PNG or WebP photo and returns its address.
+  Future<String> uploadPhoto(List<int> bytes, String type) async =>
+      '${(await _send('POST', '/me/photo', {'image': base64Encode(bytes), 'type': type}))['photoURL']}';
 
   // ---------- Places and imports ----------
 

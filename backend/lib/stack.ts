@@ -103,6 +103,26 @@ export class SidekickStack extends Stack {
         : { supportedLoginProviders: { 'accounts.google.com': props.googleClientId } }),
     });
 
+    // ---------- Profile photos: a private bucket, served through its own CDN ----------
+    // The API writes and deletes them. The CDN reads them through an origin access control, so the
+    // bucket itself stays private. Keys are random and never reused, so they're cached for a year.
+    const photoBucket = new s3.Bucket(this, 'Photos', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const photoCdn = new cloudfront.Distribution(this, 'PhotoCdn', {
+      defaultBehavior: {
+        origin: origins.S3BucketOrigin.withOriginAccessControl(photoBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        // The app runs in a browser on its own origin, so the browser must be allowed to load these.
+        responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS,
+      },
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
+    });
+
     // ---------- API ----------
     const fn = new nodejs.NodejsFunction(this, 'Api', {
       entry: path.join(__dirname, '../src/handler.ts'),
@@ -123,10 +143,14 @@ export class SidekickStack extends Stack {
         BEDROCK_REGION: props.bedrockRegion,
         PLACES_COUNTRIES: props.placesCountries,
         ADMIN_IDS: props.adminIds ?? '',
+        PHOTO_BUCKET: photoBucket.bucketName,
+        PHOTO_BASE_URL: `https://${photoCdn.distributionDomainName}`,
       },
       bundling: { minify: true, sourceMap: true, target: 'node22' },
     });
     table.grantReadWriteData(fn);
+    photoBucket.grantPut(fn);
+    photoBucket.grantDelete(fn);
     fn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
@@ -336,5 +360,6 @@ export class SidekickStack extends Stack {
     new CfnOutput(this, 'SiteUrl', { value: `https://${cdn.distributionDomainName}` });
     new CfnOutput(this, 'SiteBucket', { value: bucket.bucketName });
     new CfnOutput(this, 'SiteDistributionId', { value: cdn.distributionId });
+    new CfnOutput(this, 'PhotoBaseUrl', { value: `https://${photoCdn.distributionDomainName}` });
   }
 }

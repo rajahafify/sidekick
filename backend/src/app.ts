@@ -10,9 +10,12 @@
 //   connected with them before it's mutual.
 // - Guests can fill in a profile, check in and see who the sidekick picked, but swiping (and so
 //   matching and seeing contacts) needs a Google sign-in.
+// - Messages go only between two people who matched, and neither has blocked the other. Notes
+//   (what's new with a match) go only to the person they're about.
+// - Places and events don't check where anyone is. This is a prototype; a presence check comes later.
 import { z } from 'zod';
 import { buildImportPrompt, pageText, parseEventHtml, parseImportReply, safeUrl, type ImportedEvent } from './eventImport';
-import { formatDistance, distanceM, hash, insideFence, placeRoomId, type Fix } from './geo';
+import { hash, placeRoomId } from './geo';
 import type { Model } from './model';
 import type { Places } from './places';
 import {
@@ -38,7 +41,15 @@ export type Deps = {
   now: () => number;
   /** Cognito identity ids that may use the admin endpoints (signed in with Google only). */
   adminIds?: string[];
+  /** Where profile photos are kept, and the public address they're served from (no trailing slash). */
+  photos?: Photos;
+  photoBaseUrl?: string;
 };
+/** Profile photo storage: a private bucket behind a CDN in production, a map in tests. */
+export interface Photos {
+  put(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
+  remove(key: string): Promise<void>;
+}
 export type Req = { method: string; path: string; body: unknown; identity: Identity };
 export type Res = { status: number; body: unknown };
 
@@ -49,6 +60,12 @@ const IMPORTS_PER_USER_PER_DAY = 20;
 const PLACE_LOOKUPS_PER_USER_PER_DAY = 150;
 const EVENTS_PER_USER_PER_DAY = 20;
 const STATUS_CHECKS_PER_USER_PER_DAY = 30;
+const MESSAGES_PER_USER_PER_DAY = 300;
+const PHOTO_CHANGES_PER_USER_PER_DAY = 20;
+const MAX_PHOTO_BYTES = 2_000_000;
+const MAX_PHOTO_BASE64 = 2_800_000;
+const MAX_MESSAGE = 500;
+const NOTES_SHOWN = 100;
 
 class HttpError extends Error {
   constructor(
@@ -92,11 +109,6 @@ const iso = z
   .string()
   .datetime({ offset: true })
   .transform((v) => new Date(v).toISOString());
-const fixSchema = z.object({
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
-  accuracy: z.number().min(0).max(100000).default(0),
-});
 const eventSchema = z
   .object({
     name: str(100).min(1, 'Give the event a name.'),
@@ -117,7 +129,6 @@ const checkInSchema = z.object({
   lng: z.number().min(-180).max(180).optional(),
   day: z.string().regex(/^\d{8}$/),
   dayStart: iso,
-  fix: fixSchema.optional(),
 });
 
 function parse<T extends z.ZodTypeAny>(schema: T, body: unknown): z.output<T> {
@@ -196,6 +207,33 @@ const isOver = (e: { startsAt: string | null; endsAt: string | null }, now: numb
 };
 
 const matchKey = (a: string, b: string) => (a < b ? `MATCH#${a}#${b}` : `MATCH#${b}#${a}`);
+const pairOf = (a: string, b: string): [string, string] => (a < b ? [a, b] : [b, a]);
+const exchangeKey = (a: string, b: string) => `EXCHANGE#${pairOf(a, b).join('#')}`;
+const chatPk = (eventId: string, a: string, b: string) => `CHAT#${eventId}#${pairOf(a, b).join('#')}`;
+const randomId = () => crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+
+/** Checks the first bytes, so a file has to really be the image type it says it is. */
+function isImage(bytes: Uint8Array, type: string): boolean {
+  const head = (n: number) => Buffer.from(bytes.subarray(0, n)).toString('hex');
+  if (type === 'image/jpeg') return head(3) === 'ffd8ff';
+  if (type === 'image/png') return head(8) === '89504e470d0a1a0a';
+  return head(4) === '52494646' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP';
+}
+
+/** A note as the app shows it. The name and photo are the person's current ones, if they're still here. */
+const noteOut = ({ note, card }: { note: Record<string, any>; card: Item | null }) => ({
+  eventId: note.eventId as string,
+  other: note.other as string,
+  name: (card?.displayName as string) || (note.name as string) || 'Someone',
+  photoURL: card ? ((card.photoURL as string) ?? '') : ((note.photoURL as string) ?? ''),
+  left: !card,
+  kind: note.kind as string,
+  at: note.at as string,
+  preview: (note.preview as string) ?? '',
+  matchedAt: (note.matchedAt as string) ?? null,
+  alertUnread: note.alertUnread === true,
+  chatUnread: note.chatUnread === true,
+});
 
 // ---------- The app ----------
 
@@ -254,6 +292,7 @@ export class App {
       };
     if (parts[0] === 'admin') return this.admin(me, method, parts.slice(1), body);
     if (is('PUT', 'me')) return this.saveProfile(me, body);
+    if (is('POST', 'me', 'photo')) return this.uploadPhoto(me, body);
     if (is('DELETE', 'me')) return this.deleteAccount(me);
     if (is('GET', 'events')) return this.listEvents(me);
     if (is('POST', 'events')) return this.createEvent(me, body);
@@ -264,11 +303,20 @@ export class App {
     if (is('POST', 'report')) return this.report(me, body);
     if (is('GET', 'status')) return this.status();
     if (is('POST', 'status', 'check')) return this.checkModel(me);
+    if (is('GET', 'alerts')) return this.alerts(me);
+    if (is('POST', 'alerts', 'read')) return this.readAlerts(me);
+    if (is('GET', 'chats')) return this.chats(me);
+    if (parts[0] === 'chats' && parts.length >= 3) {
+      const [eventId, uid] = [parts[1], parts[2]];
+      if (!/^[\w-]{1,160}$/.test(eventId) || uid.length > 128) fail(404, 'Not found.');
+      if (is('GET', 'chats', '*', '*')) return this.chat(me, eventId, uid);
+      if (is('POST', 'chats', '*', '*', 'messages')) return this.send(me, eventId, uid, body);
+    }
     if (parts[0] === 'events' && parts.length >= 2) {
       const id = parts[1];
       if (!/^[\w-]{1,160}$/.test(id)) fail(404, 'Event not found.');
       if (is('GET', 'events', '*')) return this.room(me, id);
-      if (is('POST', 'events', '*', 'join')) return this.join(me, id, body);
+      if (is('POST', 'events', '*', 'join')) return this.join(me, id);
       if (is('POST', 'events', '*', 'leave')) return this.leave(me, id);
       if (is('POST', 'events', '*', 'visible')) return this.setVisible(me, id, body);
       if (is('POST', 'events', '*', 'scout')) return this.scout(me, id);
@@ -296,9 +344,26 @@ export class App {
 
   private async saveProfile(me: Identity, body: unknown) {
     const p = parse(profileSchema, body);
+    if (p.photoURL && !this.isOwnOrGooglePhoto(p.photoURL)) fail(400, 'Invalid photo.');
+    const before = await this.store.get(`USER#${me.id}`, 'PROFILE');
+    // An uploaded photo stays as long as the link is the same. A different link replaces it.
+    const keepPhoto = Boolean(before?.photoKey) && before?.photoURL === p.photoURL;
+    if (before?.photoKey && !keepPhoto) await this.removePhoto(before.photoKey);
     const profile: Profile = { ...p, onboarded: hasContact(p.contact) };
-    await this.store.put({ pk: `USER#${me.id}`, sk: 'PROFILE', ...profile, guest: me.guest, updatedAt: this.nowIso() });
-    // Keep my cards at events that are still on in step with my profile.
+    await this.store.put({
+      pk: `USER#${me.id}`,
+      sk: 'PROFILE',
+      ...profile,
+      ...(keepPhoto ? { photoKey: before!.photoKey } : {}),
+      guest: me.guest,
+      updatedAt: this.nowIso(),
+    });
+    await this.refreshCards(me, profile);
+    return { guest: me.guest, profile };
+  }
+
+  /** Keeps my cards at events that are still on in step with my profile. */
+  private async refreshCards(me: Identity, profile: Profile) {
     const now = this.d.now();
     for (const e of await this.store.query(`USER#${me.id}`, 'EVENT#')) {
       if (isOver({ startsAt: e.startsAt ?? null, endsAt: e.endsAt ?? null }, now)) continue;
@@ -306,7 +371,49 @@ export class App {
       const card = await this.store.get(`EVENT#${eventId}`, `ATT#${me.id}`);
       if (card) await this.store.put({ ...card, ...this.cardFields(me, profile), visible: card.visible !== false });
     }
-    return { guest: me.guest, profile };
+  }
+
+  /** Profile photos come from Google's sign-in picture or from our own photo store, and nowhere else. */
+  private isOwnOrGooglePhoto(url: string) {
+    let host: string;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      return false;
+    }
+    return host.endsWith('.googleusercontent.com') || (!!this.d.photoBaseUrl && url.startsWith(`${this.d.photoBaseUrl}/`));
+  }
+
+  /** Stores a new profile photo (base64 in the body), checks it really is an image, and replaces the old one. */
+  private async uploadPhoto(me: Identity, body: unknown) {
+    const { image, type } = parse(
+      z.object({
+        image: z.string().min(1).max(MAX_PHOTO_BASE64),
+        type: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+      }),
+      body,
+    );
+    if (!this.d.photos || !this.d.photoBaseUrl) fail(503, 'Photos are not set up yet.');
+    const bytes = new Uint8Array(Buffer.from(image, 'base64'));
+    if (bytes.length === 0 || bytes.length > MAX_PHOTO_BYTES) fail(400, 'Choose a photo under 2 MB.');
+    if (!isImage(bytes, type)) fail(400, 'That file is not a JPEG, PNG or WebP photo.');
+    const before =
+      (await this.store.get(`USER#${me.id}`, 'PROFILE')) ?? fail(409, 'Finish your profile first.', { needsProfile: true });
+    const today = new Date(this.d.now()).toISOString().slice(0, 10);
+    if (!(await this.takeQuota(`photo:${today}:${me.id}`, PHOTO_CHANGES_PER_USER_PER_DAY, DAY_S)))
+      fail(429, 'Too many photo changes today. Try again tomorrow.');
+    const ext = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg';
+    const key = `photos/${crypto.randomUUID()}.${ext}`;
+    await this.d.photos!.put(key, bytes, type);
+    const next = { ...before, photoURL: `${this.d.photoBaseUrl}/${key}`, photoKey: key, updatedAt: this.nowIso() };
+    await this.store.put(next);
+    if (before.photoKey) await this.removePhoto(before.photoKey);
+    await this.refreshCards(me, profileOut(next)!);
+    return { photoURL: next.photoURL };
+  }
+
+  private async removePhoto(key: string) {
+    await this.d.photos?.remove(key).catch((e) => console.error('photo remove failed', key, e));
   }
 
   private cardFields(me: Identity, p: Profile) {
@@ -395,8 +502,9 @@ export class App {
       };
     }
     if (is('DELETE', 'events', '*')) {
-      for (const i of await this.store.query(`EVENT#${id}`, '')) {
+      for (const i of await this.store.query(`EVENT#${id}`, '', 100_000)) {
         if (i.sk.startsWith('ATT#')) await this.store.delete(`USER#${i.sk.slice('ATT#'.length)}`, `EVENT#${id}`);
+        if (i.sk.startsWith('MATCH#')) await this.dropConversation(id, i.users[0], i.users[1]);
         await this.store.delete(i.pk, i.sk);
       }
       return { ok: true };
@@ -410,13 +518,20 @@ export class App {
   }
 
   private async deleteAccount(me: Identity) {
-    for (const i of await this.store.query(`USER#${me.id}`, '')) {
-      if (i.sk.startsWith('EVENT#')) {
-        const eventId = i.sk.slice('EVENT#'.length);
-        await this.store.delete(`EVENT#${eventId}`, `ATT#${me.id}`);
+    const mine = await this.store.query(`USER#${me.id}`, '');
+    const photo = mine.find((i) => i.sk === 'PROFILE')?.photoKey;
+    if (photo) await this.removePhoto(photo);
+    // Matches, swipes, notes and messages go too, and the other side loses the match with them.
+    for (const n of mine.filter((i) => i.sk.startsWith('NOTE#'))) await this.dropConversation(n.eventId, me.id, n.other);
+    for (const i of mine.filter((i) => i.sk.startsWith('EVENT#'))) {
+      const eventId = i.sk.slice('EVENT#'.length);
+      await this.store.delete(`EVENT#${eventId}`, `ATT#${me.id}`);
+      for (const s of await this.store.query(`EVENT#${eventId}`, `SWIPE#${me.id}#`)) await this.store.delete(s.pk, s.sk);
+      for (const m of await this.store.query(`EVENT#${eventId}`, 'MATCH#')) {
+        if (m.users.includes(me.id)) await this.dropConversation(eventId, me.id, m.users.find((u: string) => u !== me.id));
       }
-      await this.store.delete(i.pk, i.sk);
     }
+    for (const i of mine) await this.store.delete(i.pk, i.sk);
     return { ok: true };
   }
 
@@ -482,7 +597,6 @@ export class App {
       const d = await this.d.places.details(c.placeId).catch(() => null);
       if (d) where = { lat: d.lat, lng: d.lng };
     }
-    if (where) this.checkFence(c.fix, where, "Turn on location so Sidekick can check you're at this place.");
     if (!existing) {
       const createdAt = this.nowIso();
       await this.store.create({
@@ -506,31 +620,18 @@ export class App {
     return { id };
   }
 
-  private checkFence(fix: Fix | undefined, where: { lat: number; lng: number }, noFix: string) {
-    if (!fix) fail(403, noFix, { needsLocation: true });
-    if (!insideFence(fix!, where))
-      fail(403, `You're about ${formatDistance(distanceM(fix!, where))} away. Check in when you're there.`, { tooFar: true });
-  }
-
   private async getEvent(id: string): Promise<EventOut> {
     const i = await this.store.get(`EVENT#${id}`, 'META');
     if (!i) fail(404, 'Event not found.');
     return eventOut(i!);
   }
 
-  private async join(me: Identity, id: string, body: unknown) {
-    const { fix } = parse(z.object({ fix: fixSchema.optional() }), body);
+  private async join(me: Identity, id: string) {
     const event = await this.getEvent(id);
     const profile = await this.requireProfile(me);
     const end = endsAtMs(event);
     if (event.endsAt && end! < this.d.now())
       fail(403, event.kind === 'place' ? 'Check-ins here are closed for the day.' : 'This event has ended.');
-    if (typeof event.lat === 'number' && typeof event.lng === 'number')
-      this.checkFence(
-        fix,
-        { lat: event.lat, lng: event.lng },
-        "Turn on location so Sidekick can check you're there. Your location is only used for this check and isn't saved.",
-      );
     await this.addAttendee(me, profile, event);
     return { ok: true };
   }
@@ -590,15 +691,21 @@ export class App {
 
   private async room(me: Identity, id: string) {
     const event = await this.getEvent(id);
-    const items = await this.store.query(`EVENT#${id}`, '');
-    const cards = items.filter((i) => i.sk.startsWith('ATT#'));
+    // Three narrow reads instead of the whole event. Each has its own cap, so a busy room can't
+    // push my swipes out of the query and bring back people I've already passed.
+    const pk = `EVENT#${id}`;
+    const [cards, mySwipes, matchItems] = await Promise.all([
+      this.store.query(pk, 'ATT#'),
+      this.store.query(pk, `SWIPE#${me.id}#`),
+      this.store.query(pk, 'MATCH#'),
+    ]);
     const mine = cards.find((c) => c.uid === me.id);
     if (!mine) return { event, guest: me.guest, me: null, count: cards.length };
     const others = await this.visibleOthers(me, id, cards);
     const swipes: Record<string, boolean> = {};
-    for (const s of items) if (s.sk.startsWith(`SWIPE#${me.id}#`)) swipes[s.to] = s.like === true;
-    const matches = items
-      .filter((m) => m.sk.startsWith('MATCH#') && m.users.includes(me.id))
+    for (const s of mySwipes) swipes[s.to] = s.like === true;
+    const matches = matchItems
+      .filter((m) => m.users.includes(me.id))
       .map((m) => ({ uid: m.users.find((u: string) => u !== me.id), createdAt: m.createdAt }));
     return {
       event,
@@ -662,7 +769,11 @@ export class App {
     const back = await this.store.get(`EVENT#${id}`, `SWIPE#${to}#${me.id}`);
     if (back?.like !== true) return { match: false };
     const users = [me.id, to].sort();
-    await this.store.create({ pk: `EVENT#${id}`, sk: matchKey(me.id, to), users, createdAt: this.nowIso() });
+    const at = this.nowIso();
+    if (await this.store.create({ pk: `EVENT#${id}`, sk: matchKey(me.id, to), users, createdAt: at })) {
+      await this.bumpNote(me.id, id, to, theirs, { kind: 'match', at, matchedAt: at, alertUnread: false });
+      await this.bumpNote(to, id, me.id, mine, { kind: 'match', at, matchedAt: at, alertUnread: true });
+    }
     return { match: true };
   }
 
@@ -683,25 +794,132 @@ export class App {
       person: b,
       contact: { linkedin: '', email: '', phone: '', ...(theirs!.contact ?? {}) },
       matchedAt: m!.createdAt,
-      exchange: await this.exchange(id, a, b),
+      exchange: await this.exchangeFor(id, a, b),
     };
   }
 
-  private async exchange(eventId: string, a: Card, b: Card): Promise<Exchange> {
-    const [x, y] = [a.uid, b.uid].sort();
-    const key = `ex:${eventId}:${x}:${y}`;
-    const hit = await this.cached<Exchange>(key);
-    if (hit) return hit;
+  /** The agents' conversation for a match. It's made once, on first view, and kept with the match for good. */
+  private async exchangeFor(eventId: string, a: Card, b: Card): Promise<Exchange> {
+    const pk = `EVENT#${eventId}`;
+    const sk = exchangeKey(a.uid, b.uid);
+    const kept = await this.store.get(pk, sk);
+    if (kept) return kept.exchange as Exchange;
+    let ex: Exchange | null = null;
     if (this.d.model && (await this.takeQuota(`rl:${eventId}:${a.uid}`, OPENERS_PER_USER_PER_EVENT))) {
       const { text, error } = await this.d.model(buildPrompt(a, b), { maxTokens: 500, temperature: 0.7 });
       if (error) console.error('exchange model error', error);
-      const ex = text ? parseLlmExchange(text, a, b) : null;
-      if (ex) {
-        await this.cache(key, ex, 30 * DAY_S);
-        return ex;
-      }
+      ex = text ? parseLlmExchange(text, a, b) : null;
     }
-    return templateExchange(a, b);
+    ex ??= templateExchange(a, b);
+    // First write wins, so both people always read the same conversation.
+    if (await this.store.create({ pk, sk, exchange: ex, createdAt: this.nowIso() })) return ex;
+    return ((await this.store.get(pk, sk))?.exchange ?? ex) as Exchange;
+  }
+
+  // ---------- Alerts and messages ----------
+
+  /** My note about one match: the latest thing between us, and what I haven't seen yet. */
+  private async bumpNote(owner: string, eventId: string, other: string, card: Item | null, patch: Record<string, unknown>) {
+    const sk = `NOTE#${eventId}#${other}`;
+    const prev: Record<string, any> = (await this.store.get(`USER#${owner}`, sk)) ?? {};
+    await this.store.put({
+      ...prev,
+      pk: `USER#${owner}`,
+      sk,
+      eventId,
+      other,
+      name: card?.displayName || prev.name || 'Someone',
+      photoURL: card ? (card.photoURL ?? '') : (prev.photoURL ?? ''),
+      ...patch,
+    });
+  }
+
+  /** Talking is only for people who matched, and only while neither side has blocked the other. */
+  private async matchedPair(me: Identity, eventId: string, other: string) {
+    if (!(await this.store.get(`EVENT#${eventId}`, matchKey(me.id, other)))) fail(404, 'No match with this person.');
+    if ((await this.store.get(`USER#${me.id}`, `BLOCK#${other}`)) || (await this.store.get(`USER#${other}`, `BLOCK#${me.id}`)))
+      fail(404, 'No match with this person.');
+  }
+
+  /** My notes, newest first, skipping anyone blocked either way. Names and photos are read now. */
+  private async notes(me: Identity) {
+    const [rows, blocked] = await Promise.all([this.store.query(`USER#${me.id}`, 'NOTE#'), this.blockedSet(me.id)]);
+    const out: { note: Record<string, any>; card: Item | null }[] = [];
+    for (const note of rows) {
+      if (blocked.has(note.other)) continue;
+      if ((await this.store.get(`USER#${note.other}`, `BLOCK#${me.id}`)) !== null) continue;
+      out.push({ note, card: await this.store.get(`EVENT#${note.eventId}`, `ATT#${note.other}`) });
+    }
+    return out.sort((a, b) => String(b.note.at).localeCompare(String(a.note.at)));
+  }
+
+  private async alerts(me: Identity) {
+    const all = (await this.notes(me)).map(noteOut);
+    return { items: all.slice(0, NOTES_SHOWN), unread: all.filter((n) => n.alertUnread).length };
+  }
+
+  private async readAlerts(me: Identity) {
+    for (const n of await this.store.query(`USER#${me.id}`, 'NOTE#')) {
+      if (n.alertUnread === true) await this.store.put({ ...n, alertUnread: false });
+    }
+    return { ok: true };
+  }
+
+  private async chats(me: Identity) {
+    const all = (await this.notes(me)).map(noteOut);
+    return { items: all.slice(0, NOTES_SHOWN), unread: all.filter((n) => n.chatUnread).length };
+  }
+
+  /** One conversation: the latest messages, oldest first. Opening it marks it read. */
+  private async chat(me: Identity, eventId: string, other: string) {
+    if (me.guest) fail(403, 'Sign in with Google to message people.', { needsLogin: true });
+    await this.matchedPair(me, eventId, other);
+    const [card, note, rows] = await Promise.all([
+      this.store.get(`EVENT#${eventId}`, `ATT#${other}`),
+      this.store.get(`USER#${me.id}`, `NOTE#${eventId}#${other}`),
+      this.store.query(chatPk(eventId, me.id, other), 'MSG#', 50, true),
+    ]);
+    if (note?.chatUnread === true) await this.store.put({ ...note, chatUnread: false });
+    return {
+      person: {
+        uid: other,
+        name: card?.displayName || note?.name || 'Someone',
+        photoURL: card ? (card.photoURL ?? '') : (note?.photoURL ?? ''),
+        left: !card,
+      },
+      messages: rows.reverse().map((m) => ({ id: m.sk, mine: m.from === me.id, text: m.text, at: m.at })),
+    };
+  }
+
+  /** Sends a message to someone I matched with, and lets them know. */
+  private async send(me: Identity, eventId: string, other: string, body: unknown) {
+    if (me.guest) fail(403, 'Sign in with Google to message people.', { needsLogin: true });
+    const { text } = parse(z.object({ text: str(MAX_MESSAGE).min(1, 'Write a message first.') }), body);
+    await this.matchedPair(me, eventId, other);
+    const today = new Date(this.d.now()).toISOString().slice(0, 10);
+    if (!(await this.takeQuota(`msg:${today}:${me.id}`, MESSAGES_PER_USER_PER_DAY, DAY_S)))
+      fail(429, "You've sent a lot of messages today. Try again tomorrow.");
+    const at = this.nowIso();
+    const sk = `MSG#${at}#${randomId()}`;
+    await this.store.put({ pk: chatPk(eventId, me.id, other), sk, from: me.id, text, at });
+    const [mine, theirs] = await Promise.all([
+      this.store.get(`EVENT#${eventId}`, `ATT#${me.id}`),
+      this.store.get(`EVENT#${eventId}`, `ATT#${other}`),
+    ]);
+    const preview = text.slice(0, 80);
+    await this.bumpNote(me.id, eventId, other, theirs, { kind: 'message', at, preview, chatUnread: false });
+    await this.bumpNote(other, eventId, me.id, mine, { kind: 'message', at, preview, chatUnread: true, alertUnread: true });
+    return { message: { id: sk, mine: true, text, at } };
+  }
+
+  /** Takes a match, and everything said in it, for both people. */
+  private async dropConversation(eventId: string, a: string, b: string) {
+    const pk = `EVENT#${eventId}`;
+    await this.store.delete(pk, matchKey(a, b));
+    await this.store.delete(pk, exchangeKey(a, b));
+    for (const m of await this.store.query(chatPk(eventId, a, b), '')) await this.store.delete(m.pk, m.sk);
+    await this.store.delete(`USER#${a}`, `NOTE#${eventId}#${b}`);
+    await this.store.delete(`USER#${b}`, `NOTE#${eventId}#${a}`);
   }
 
   // ---------- Safety ----------

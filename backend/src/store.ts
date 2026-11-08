@@ -8,8 +8,11 @@
 //   EVENT#<id>       ATT#<uid>             attendee card + contact (contact is only ever sent to matches)
 //   EVENT#<id>       SWIPE#<from>#<to>     Connect or Pass; never sent to anyone but the swiper
 //   EVENT#<id>       MATCH#<a>#<b>         a mutual Connect (a < b)
+//   EVENT#<id>       EXCHANGE#<a>#<b>      the agents' conversation for a match, kept for good
+//   USER#<id>        NOTE#<eventId>#<uid>  my latest news with one match: alerts and the message list
+//   CHAT#<eventId>#<a>#<b>  MSG#<iso>#<id> a message between two matched people
 //   QUOTA#<key>      QUOTA                 counts model calls; expires with ttl
-//   CACHE#<key>      CACHE                 cached model answers; expires with ttl
+//   CACHE#<key>      CACHE                 cached model answers (scouting rankings); expire with ttl
 //   REPORT#<id>      REPORT                a report about someone
 //   SETTINGS#app     SETTINGS              app-wide settings: the default theme (the admin sets it)
 import { ConditionalCheckFailedException, DynamoDBClient } from '@aws-sdk/client-dynamodb';
@@ -31,8 +34,8 @@ export interface Store {
   /** Puts only if the key doesn't exist yet. Returns false if it did. */
   create(item: Item): Promise<boolean>;
   delete(pk: string, sk: string): Promise<void>;
-  /** Items under pk whose sk starts with prefix. */
-  query(pk: string, prefix: string, limit?: number): Promise<Item[]>;
+  /** Items under pk whose sk starts with prefix, in sk order (newest first when reverse is true). */
+  query(pk: string, prefix: string, limit?: number, reverse?: boolean): Promise<Item[]>;
   /** Newest items in the gsi1 list (e.g. EVENTS). */
   recent(gsi1pk: string, limit: number): Promise<Item[]>;
   /** Adds 1 to a counter and returns the new value. */
@@ -74,7 +77,7 @@ export class DynamoStore implements Store {
     await this.db.send(new DeleteCommand({ TableName: this.table, Key: { pk, sk } }));
   }
 
-  async query(pk: string, prefix: string, limit = 1000) {
+  async query(pk: string, prefix: string, limit = 1000, reverse = false) {
     const out: Item[] = [];
     let start: Record<string, any> | undefined;
     do {
@@ -85,6 +88,7 @@ export class DynamoStore implements Store {
           KeyConditionExpression: prefix ? 'pk = :pk AND begins_with(sk, :p)' : 'pk = :pk',
           ExpressionAttributeValues: prefix ? { ':pk': pk, ':p': prefix } : { ':pk': pk },
           ExclusiveStartKey: start,
+          ScanIndexForward: !reverse,
           Limit: limit - out.length,
         }),
       );
@@ -161,10 +165,10 @@ export class MemoryStore implements Store {
   async delete(pk: string, sk: string) {
     this.items.delete(this.k(pk, sk));
   }
-  async query(pk: string, prefix: string, limit = 1000) {
+  async query(pk: string, prefix: string, limit = 1000, reverse = false) {
     return [...this.items.values()]
       .filter((i) => i.pk === pk && i.sk.startsWith(prefix))
-      .sort((a, b) => (a.sk < b.sk ? -1 : 1))
+      .sort((a, b) => (a.sk < b.sk ? -1 : 1) * (reverse ? -1 : 1))
       .slice(0, limit)
       .map(this.copy);
   }

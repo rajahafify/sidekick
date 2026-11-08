@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/api.dart';
+import '../logic/image.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
@@ -22,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late List<String> lookingFor, offering;
   late String photo;
   bool saving = false;
+  bool uploading = false;
   String? error;
   bool _init = false;
 
@@ -50,6 +53,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Picks a photo, uploads it, and makes it the one Save keeps. The server only keeps an upload
+  /// while the link it's sent with is the one it gave out, so `photo` has to follow the upload.
+  Future<void> _changePhoto() async {
+    final session = SessionScope.of(context);
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    final type = imageType(bytes);
+    if (type == null) {
+      if (mounted) toast(context, 'Choose a JPEG, PNG or WebP photo.');
+      return;
+    }
+    setState(() => uploading = true);
+    try {
+      final url = await session.api.uploadPhoto(bytes, type);
+      if (!mounted) return;
+      setState(() => photo = url);
+      await session.reloadProfile();
+    } on ApiError catch (e) {
+      if (mounted) toast(context, e.message);
+    } finally {
+      if (mounted) setState(() => uploading = false);
+    }
   }
 
   Future<void> _save() async {
@@ -146,7 +179,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ]),
-            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: uploading ? null : _changePhoto,
+                child: Text(uploading ? 'Uploading…' : 'Change photo'),
+              ),
+            ),
+            const SizedBox(height: 8),
             TextFormField(
               controller: headline,
               maxLength: 100,

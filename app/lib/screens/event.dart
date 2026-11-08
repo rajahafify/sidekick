@@ -9,7 +9,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
 import '../data/api.dart';
-import '../data/location.dart';
 import '../logic/geo_when.dart';
 import '../logic/sidekick.dart';
 import '../main.dart';
@@ -123,16 +122,7 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   Future<void> _join() => _run(() async {
-    final e = room!.event;
-    Map<String, dynamic>? fix;
-    if (e.hasLocation) {
-      final f = await currentFix();
-      if (f == null) {
-        throw ApiError("Turn on location so Sidekick can check you're there. It's only used for this check.");
-      }
-      fix = {'lat': f.lat, 'lng': f.lng, 'accuracy': f.accuracy};
-    }
-    await api.join(widget.id, fix);
+    await api.join(widget.id);
     await _load();
   });
 
@@ -419,7 +409,7 @@ class _EventScreenState extends State<EventScreen> {
             phase == EventPhase.ended
                 ? 'This event has ended.'
                 : 'Check in and your sidekick scouts everyone here, then shows you who is worth meeting. '
-                      "Nobody sees who you pass on.${r.event.hasLocation ? " You need to be at the venue." : ''}",
+                      'Nobody sees who you pass on.',
             style: TextStyle(color: C.muted, fontSize: 15, height: 1.4),
           ),
           const SizedBox(height: 18),

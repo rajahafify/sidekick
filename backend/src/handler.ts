@@ -14,6 +14,7 @@ type IamEvent = APIGatewayProxyEventV2 & {
 import { App, type Identity } from './app';
 import { bedrockModel, openRouterModel, ssmSecret, type Model } from './model';
 import { locationPlaces } from './places';
+import { s3Photos } from './photos';
 import { DynamoStore } from './store';
 
 const env = process.env;
@@ -34,6 +35,8 @@ const app = new App({
   fetch,
   now: () => Date.now(),
   adminIds: (env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  photos: env.PHOTO_BUCKET ? s3Photos(env.PHOTO_BUCKET) : undefined,
+  photoBaseUrl: env.PHOTO_BASE_URL,
 });
 
 /** Who's calling. `amr` lists "unauthenticated" for guests, "authenticated" once they've signed in. */

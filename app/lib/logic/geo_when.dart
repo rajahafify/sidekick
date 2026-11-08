@@ -13,9 +13,6 @@ class Fix extends LatLng {
   final double accuracy;
 }
 
-/// How close you need to be to check in. Generous, because GPS is rough indoors.
-const geofenceM = 500.0;
-
 /// Great-circle distance in metres.
 double distanceM(LatLng a, LatLng b) {
   double rad(double d) => d * math.pi / 180;
@@ -25,10 +22,6 @@ double distanceM(LatLng a, LatLng b) {
       math.cos(rad(a.lat)) * math.cos(rad(b.lat)) * math.pow(math.sin(dLng / 2), 2);
   return 2 * 6371000 * math.asin(math.sqrt(h));
 }
-
-/// Whether a fix is inside the geofence. A fuzzy fix gets the benefit of the doubt up to 1 km.
-bool insideFence(Fix fix, LatLng place, [double radius = geofenceM]) =>
-    distanceM(fix, place) - math.min(fix.accuracy, 1000) <= radius;
 
 String formatDistance(double m) {
   if (m < 1000) return '${(m / 10).round() * 10} m';

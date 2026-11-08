@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/api.dart';
+import '../data/session.dart';
 import '../logic/geo_when.dart';
 import '../main.dart';
 import '../models.dart';
@@ -10,33 +13,103 @@ import '../widgets/sign_in_sheet.dart';
 import '../widgets/sidekick_status.dart';
 import '../widgets/ui.dart';
 import 'check_in.dart';
+import 'inbox.dart';
 
-/// Events and You, with the raised + in the middle (add an event or check in to a place).
-/// Tab 1 is the place check-in, reached through the +.
-class HomeShell extends StatelessWidget {
+/// Events, Messages, Alerts and You, with the raised + in the middle (add an event, or check in to
+/// a place). The place check-in is tab 2; the + sheet opens it, so the bar doesn't show it.
+class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.tab});
   final int tab;
 
   @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  Session? session;
+  Timer? timer;
+  int alerts = 0;
+  int chats = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (session != null) return;
+    session = SessionScope.of(context);
+    _counts();
+    timer = Timer.periodic(const Duration(seconds: 30), (_) => _counts());
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  /// How many alerts and conversations are unread, for the badges on the tabs.
+  Future<void> _counts() async {
+    final s = session;
+    if (s == null || s.guest) return;
+    try {
+      final a = await s.api.alerts();
+      final c = await s.api.chats();
+      if (mounted) {
+        setState(() {
+          alerts = a.unread;
+          chats = c.unread;
+        });
+      }
+    } catch (_) {
+      // A badge that's a little behind catches up on the next check.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-        body: IndexedStack(index: tab, children: const [EventsTab(), CheckInView(), MeTab()]),
-        bottomNavigationBar: _TabBar(tab: tab),
+        body: IndexedStack(
+          index: widget.tab,
+          children: const [EventsTab(), MessagesTab(), CheckInView(), AlertsTab(), MeTab()],
+        ),
+        bottomNavigationBar: _TabBar(
+          tab: widget.tab,
+          // The tab you're on has just been seen, so it doesn't badge.
+          messages: widget.tab == 1 ? 0 : chats,
+          alerts: widget.tab == 3 ? 0 : alerts,
+        ),
       );
 }
 
 class _TabBar extends StatelessWidget {
-  const _TabBar({required this.tab});
+  const _TabBar({required this.tab, required this.messages, required this.alerts});
   final int tab;
+  final int messages;
+  final int alerts;
 
   @override
   Widget build(BuildContext context) {
-    Widget item(int i, IconData icon, IconData active, String label, String path) {
+    Widget item(int i, IconData icon, IconData active, String label, String path, {int badge = 0}) {
       final on = tab == i;
       return Expanded(
         child: InkWell(
           onTap: () => context.go(path),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(on ? active : icon, color: on ? C.go : C.muted, size: 24),
+            Stack(clipBehavior: Clip.none, children: [
+              Icon(on ? active : icon, color: on ? C.go : C.muted, size: 24),
+              if (badge > 0)
+                Positioned(
+                  right: -4,
+                  top: -2,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: C.go,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: C.paper, width: 2),
+                    ),
+                  ),
+                ),
+            ]),
             const SizedBox(height: 4),
             Text(label, style: TextStyle(fontSize: 12, color: on ? C.go : C.muted, fontWeight: FontWeight.w500)),
           ]),
@@ -53,8 +126,10 @@ class _TabBar extends StatelessWidget {
           child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
             Row(children: [
               item(0, Icons.calendar_today_outlined, Icons.calendar_today, 'Events', '/'),
+              item(1, Icons.chat_bubble_outline, Icons.chat_bubble, 'Messages', '/messages', badge: messages),
               const SizedBox(width: 88),
-              item(2, Icons.person_outline, Icons.person, 'You', '/me'),
+              item(3, Icons.notifications_none, Icons.notifications, 'Alerts', '/alerts', badge: alerts),
+              item(4, Icons.person_outline, Icons.person, 'You', '/me'),
             ]),
             Positioned(
               top: -22,

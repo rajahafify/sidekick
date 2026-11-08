@@ -24,6 +24,110 @@ DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : nu
 double? _num(Object? v) => v is num ? v.toDouble() : null;
 Map<String, dynamic> _map(Object? v) => v is Map ? v.cast<String, dynamic>() : const {};
 
+/// What's new with one match, for the Alerts and Messages tabs. One per match, kept up to date.
+class Note {
+  const Note({
+    required this.eventId,
+    required this.other,
+    required this.name,
+    this.photoURL = '',
+    this.left = false,
+    this.kind = 'match',
+    this.at,
+    this.preview = '',
+    this.matchedAt,
+    this.alertUnread = false,
+    this.chatUnread = false,
+  });
+
+  final String eventId;
+  final String other;
+  final String name;
+  final String photoURL;
+
+  /// They've left the event. The match and the conversation still stand.
+  final bool left;
+
+  /// 'match', or 'message' when the latest thing is a message.
+  final String kind;
+  final DateTime? at;
+  final String preview;
+  final DateTime? matchedAt;
+  final bool alertUnread;
+  final bool chatUnread;
+
+  bool get isMatch => kind == 'match';
+
+  factory Note.fromMap(Map<String, dynamic> m) => Note(
+        eventId: '${m['eventId'] ?? ''}',
+        other: '${m['other'] ?? ''}',
+        name: '${m['name'] ?? ''}',
+        photoURL: '${m['photoURL'] ?? ''}',
+        left: m['left'] == true,
+        kind: '${m['kind'] ?? 'match'}',
+        at: _date(m['at']),
+        preview: '${m['preview'] ?? ''}',
+        matchedAt: _date(m['matchedAt']),
+        alertUnread: m['alertUnread'] == true,
+        chatUnread: m['chatUnread'] == true,
+      );
+}
+
+/// The notes, newest first, and how many of them are unread.
+class NoteList {
+  const NoteList(this.items, this.unread);
+  final List<Note> items;
+  final int unread;
+
+  factory NoteList.fromMap(Map<String, dynamic> m) => NoteList(
+        ((m['items'] as List?) ?? const []).map((e) => Note.fromMap(_map(e))).toList(),
+        (m['unread'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class ChatMessage {
+  const ChatMessage({required this.id, required this.mine, required this.text, this.at});
+  final String id;
+  final bool mine;
+  final String text;
+  final DateTime? at;
+
+  factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
+        id: '${m['id'] ?? ''}',
+        mine: m['mine'] == true,
+        text: '${m['text'] ?? ''}',
+        at: _date(m['at']),
+      );
+}
+
+/// A conversation with one match: who it's with, and the latest messages, oldest first.
+class ChatThread {
+  const ChatThread({
+    required this.uid,
+    required this.name,
+    this.photoURL = '',
+    this.left = false,
+    this.messages = const [],
+  });
+
+  final String uid;
+  final String name;
+  final String photoURL;
+  final bool left;
+  final List<ChatMessage> messages;
+
+  factory ChatThread.fromMap(Map<String, dynamic> m) {
+    final p = _map(m['person']);
+    return ChatThread(
+      uid: '${p['uid'] ?? ''}',
+      name: '${p['name'] ?? ''}',
+      photoURL: '${p['photoURL'] ?? ''}',
+      left: p['left'] == true,
+      messages: ((m['messages'] as List?) ?? const []).map((e) => ChatMessage.fromMap(_map(e))).toList(),
+    );
+  }
+}
+
 class Contact {
   const Contact({this.linkedin = '', this.email = '', this.phone = ''});
   final String linkedin;
