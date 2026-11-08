@@ -3,8 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config.dart';
@@ -16,6 +14,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/dots.dart';
+import '../widgets/room_share.dart';
 import '../widgets/sign_in_sheet.dart';
 import '../widgets/ui.dart';
 
@@ -224,41 +223,7 @@ class _EventScreenState extends State<EventScreen> {
   }
 
   void _shareSheet() {
-    final link = Config.eventLink(widget.id);
-    showModalBottomSheet(
-      context: context,
-      showDragHandle: true,
-      builder: (c) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Bring the room in', style: displayStyle(32)),
-              const SizedBox(height: 8),
-              Text(
-                'Sidekick only works when people are checked in. Share the link or put the code on screen.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: C.muted),
-              ),
-              const SizedBox(height: 18),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(20)),
-                child: QrImageView(data: link, size: 200, backgroundColor: C.ink),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () =>
-                    SharePlus.instance.share(ShareParams(text: '${room?.event.name ?? 'Join me'} on Sidekick: $link')),
-                icon: const Icon(Icons.ios_share),
-                label: const Text('Share link'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showRoomShare(context, link: Config.eventLink(widget.id), eventName: room?.event.name);
   }
 
   Future<void> _menu() async {

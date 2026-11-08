@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sidekick/data/identity.dart';
 import 'package:sidekick/data/session.dart';
+import 'package:sidekick/models.dart';
 
 /// A person signed in with Google, whose saved sign-in can't be renewed the way [failure] says.
 class RenewalSession extends Session {
@@ -35,5 +36,12 @@ void main() {
 
     expect(s.started, isTrue);
     expect(s.startError, "Couldn't reach Sidekick. Check your connection and try again.");
+  });
+
+  test('before the server says otherwise, the look is light', () {
+    final s = Session();
+
+    expect(s.defaultTheme, ThemeChoice.light);
+    expect(s.theme, ThemeChoice.light);
   });
 }

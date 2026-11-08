@@ -283,12 +283,13 @@ describe('admin', () => {
 
   it('sets the theme for everyone who has not picked one, and only admins can', async () => {
     const s = setup({ adminIds: [admin.id] });
-    expect((await s.call(bob, 'GET', '/me')).body.defaultTheme).toBe('dark');
+    // Light is the default until an admin picks another look.
+    expect((await s.call(bob, 'GET', '/me')).body.defaultTheme).toBe('light');
     expect((await s.call(bob, 'PUT', '/admin/settings', { defaultTheme: 'light' })).status).toBe(403);
     expect((await s.call(admin, 'PUT', '/admin/settings', { defaultTheme: 'neon' })).status).toBe(400);
-    expect((await s.call(admin, 'PUT', '/admin/settings', { defaultTheme: 'light' })).body).toEqual({ defaultTheme: 'light' });
-    expect((await s.call(bob, 'GET', '/me')).body.defaultTheme).toBe('light');
-    expect((await s.call(guest, 'GET', '/me')).body.defaultTheme).toBe('light');
+    expect((await s.call(admin, 'PUT', '/admin/settings', { defaultTheme: 'dark' })).body).toEqual({ defaultTheme: 'dark' });
+    expect((await s.call(bob, 'GET', '/me')).body.defaultTheme).toBe('dark');
+    expect((await s.call(guest, 'GET', '/me')).body.defaultTheme).toBe('dark');
   });
 
   it('lists people, events and reports, and deletes them', async () => {

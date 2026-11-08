@@ -332,7 +332,7 @@ export class App {
   /** The theme for people who haven't picked their own. */
   private async defaultTheme(): Promise<(typeof themes)[number]> {
     const s = await this.store.get('SETTINGS#app', 'SETTINGS');
-    return (themes as readonly string[]).includes(s?.defaultTheme) ? s!.defaultTheme : 'dark';
+    return (themes as readonly string[]).includes(s?.defaultTheme) ? s!.defaultTheme : 'light';
   }
 
   private async admin(me: Identity, method: string, p: string[], body: unknown): Promise<unknown> {

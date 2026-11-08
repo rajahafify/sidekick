@@ -76,7 +76,7 @@ class Session extends ChangeNotifier implements Credentials {
 
   static const _kTheme = 'theme';
   ThemeChoice? _ownTheme;
-  ThemeChoice _defaultTheme = ThemeChoice.dark;
+  ThemeChoice _defaultTheme = ThemeChoice.light;
 
   /// The look in use: this person's own pick, else the admin's default.
   ThemeChoice get theme => _ownTheme ?? _defaultTheme;

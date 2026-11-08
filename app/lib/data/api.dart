@@ -97,7 +97,7 @@ class Api {
     return (
       guest: j['guest'] == true,
       profile: p is Map ? Profile.fromMap(p.cast<String, dynamic>()) : null,
-      defaultTheme: ThemeChoice.parse(j['defaultTheme']),
+      defaultTheme: ThemeChoice.parse(j['defaultTheme'], fallback: ThemeChoice.light),
     );
   }
 
