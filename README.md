@@ -13,7 +13,8 @@ Everything runs on AWS, in one CDK stack.
 | App | `app/` | Flutter: the same app is the Android app and the website at sidekick.artifisi.com. Dark is white on black, light is black on white (each person picks, the admin sets the default). Halftone dots, Signal orange. |
 | Identity | Cognito identity pool | A guest gets an unauthenticated identity. Google sign-in is linked to that same identity, so a guest keeps their data. Both get short-lived AWS credentials that can only call the API. |
 | API | API Gateway (HTTP API, IAM auth) → Lambda (`backend/src`) | One Node 22 Lambda. API Gateway checks each request's signature and tells the Lambda who is calling and whether they're a guest. |
-| Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches. Layout in `backend/src/store.ts`. |
+| Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches, the agents' exchange for each match (kept with the match), notes for the Alerts and Messages tabs, messages, and connections (the people you've connected with, across events). Layout in `backend/src/store.ts`. |
+| Photos | S3 (private bucket) behind CloudFront | Profile photos uploaded from the app, checked to be JPEG, PNG or WebP, at most 2 MB. Served from their own CDN address (`PhotoBaseUrl` in the stack outputs). |
 | Sidekick | OpenRouter free models for now (`openrouter/free`), Amazon Bedrock Claude Haiku 5.5 later | The OpenRouter key lives in SSM Parameter Store, never in the app. Bedrock uses the Lambda's IAM role. Cached, rate limited per person, with a template fallback (`backend/src/sidekick.ts`). |
 | Places | Amazon Location Service (Places) | Place suggestions and "near me" for check-ins. Also IAM, no key. |
 | Website | Cloudflare Pages | The Flutter web build, built by Cloudflare from this repo (`app/cloudflare-build.sh`) on every push, at sidekick.artifisi.com. Event links (`/e/<id>`) open the app: on Android the installed app, elsewhere the web app. Also serves Android app-link verification. |
@@ -24,8 +25,11 @@ Everything runs on AWS, in one CDK stack.
 - Attendee cards are only shown to people checked in to the same event. Contact details are never on a card; they're returned only to someone you matched with.
 - Swipes are only ever returned to the swiper.
 - A match needs two Connects. Blocks hide people both ways.
+- Connections (the Connected tab) are only shown to the two people in them. They're kept across events, so a later event doesn't ask you to connect again, and they go when the event they were made at is deleted or either account is deleted.
 - Guests can't swipe or see matches.
-- When an event has a location, you have to be within 500 m to check in (checked on the server).
+- Messages go only between two people who matched, and not once either side has blocked the other. Alerts and the message list go only to the person they're about.
+- A match's agent exchange is made once, on first view, and kept with the match.
+- Prototype: places and events don't check where anyone is. Anyone can check in or join from anywhere. A real presence check (a rotating venue code, or stricter location) is an open decision before the first real event.
 
 ## Local development
 

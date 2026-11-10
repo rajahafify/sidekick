@@ -80,8 +80,6 @@ class _CheckInViewState extends State<CheckInView> {
     });
     final api = SessionScope.of(context).api;
     try {
-      // We only need your location if we know where the place is.
-      if (fix == null && picked != null) fix = await currentFix();
       final now = DateTime.now();
       final dayStart = DateTime(now.year, now.month, now.day);
       String two(int n) => n.toString().padLeft(2, '0');
@@ -91,18 +89,9 @@ class _CheckInViewState extends State<CheckInView> {
         if (picked?.lat != null && picked?.lng != null) ...{'lat': picked!.lat, 'lng': picked!.lng},
         'day': '${now.year}${two(now.month)}${two(now.day)}',
         'dayStart': dayStart.toUtc().toIso8601String(),
-        if (fix != null) 'fix': {'lat': fix!.lat, 'lng': fix!.lng, 'accuracy': fix!.accuracy},
       });
       if (mounted) context.push('/e/$id');
     } on ApiError catch (e) {
-      if (e.needsLocation) {
-        final here = await currentFix();
-        if (here != null && mounted) {
-          fix = here;
-          setState(() => pending = false);
-          return _checkIn();
-        }
-      }
       if (mounted) setState(() => error = e.message);
     } finally {
       if (mounted) setState(() => pending = false);
@@ -174,11 +163,6 @@ class _CheckInViewState extends State<CheckInView> {
                 onPressed: pending || v.text.trim().isEmpty ? null : _checkIn,
                 child: pending ? const ButtonProgress() : const Text('Check in here'),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'When we know where the place is, you need to be there to check in. Your location is only used for that check.',
-              style: TextStyle(color: C.muted, fontSize: 13),
             ),
             const SizedBox(height: 22),
             Center(

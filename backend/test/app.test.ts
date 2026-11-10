@@ -112,15 +112,12 @@ describe('the room', () => {
     expect((await s.call(bob, 'GET', '/events')).body.open).toEqual([]);
   });
 
-  it('checks you are at the venue when it has a location', async () => {
+  it('lets anyone join from anywhere while we are prototyping', async () => {
     const s = setup();
     await s.call(bob, 'PUT', '/me', profile('Bob'));
     const { body } = await s.call(alice, 'POST', '/events', { name: 'KLCC', lat: 3.1579, lng: 101.7116 });
-    expect((await s.call(bob, 'POST', `/events/${body.id}/join`, {})).body.needsLocation).toBe(true);
-    const far = await s.call(bob, 'POST', `/events/${body.id}/join`, { fix: { lat: 3.17, lng: 101.7116, accuracy: 20 } });
-    expect(far.body.tooFar).toBe(true);
-    const near = await s.call(bob, 'POST', `/events/${body.id}/join`, { fix: { lat: 3.16, lng: 101.7116, accuracy: 20 } });
-    expect(near.status).toBe(200);
+    expect((await s.call(bob, 'POST', `/events/${body.id}/join`, { fix: { lat: 3.25, lng: 101.7116, accuracy: 20 } })).status).toBe(200);
+    expect((await s.call(bob, 'GET', `/events/${body.id}`)).body.me).not.toBeNull();
   });
 });
 
@@ -197,13 +194,13 @@ describe('place check-ins', () => {
     expect(r.body.people).toHaveLength(1);
   });
 
-  it('needs you to be there', async () => {
+  it('lets anyone check in from anywhere while we are prototyping', async () => {
     const s = setup({ places });
     await s.call(alice, 'PUT', '/me', profile('Alice'));
     const far = { lat: 3.25, lng: 101.7116, accuracy: 30 };
     const r = await s.call(alice, 'POST', '/checkin', { place: 'Common Ground', placeId: 'AQAB-xyz', day, dayStart, fix: far });
-    expect(r.status).toBe(403);
-    expect(r.body.error).toMatch(/away/);
+    expect(r.status).toBe(200);
+    expect(r.body.id).toBe(placeRoomId('AQAB-xyz', '', day));
   });
 
   it('slugs typed places and rejects a wrong date', async () => {
@@ -315,5 +312,246 @@ describe('admin', () => {
     await s.call(admin, 'DELETE', `/admin/events/${id}`);
     expect((await s.call(admin, 'GET', `/admin/events/${id}`)).status).toBe(404);
     expect(await s.store.query(`USER#${alice.id}`, 'EVENT#')).toHaveLength(0);
+  });
+});
+
+describe('a busy room', () => {
+  it('keeps every pass, even past the 1,000-item query cap', async () => {
+    const s = setup();
+    const people: Identity[] = Array.from({ length: 40 }, (_, i) => ({
+      id: `ap-southeast-1:p${String(i).padStart(2, '0')}`,
+      guest: false,
+    }));
+    const id = await room(s, people);
+    // Everyone passes on everyone else: 1,560 swipes, which is more than the cap.
+    for (const from of people)
+      for (const to of people)
+        if (from !== to)
+          await s.store.put({ pk: `EVENT#${id}`, sk: `SWIPE#${from.id}#${to.id}`, from: from.id, to: to.id, like: false, at: '' });
+    const view = await s.call(people[39], 'GET', `/events/${id}`);
+    expect(Object.keys(view.body.swipes)).toHaveLength(39);
+    expect(view.body.people).toHaveLength(39);
+  });
+});
+
+describe('the agents\' conversation', () => {
+  it('is made once, kept with the match, and read back the same for both people', async () => {
+    let calls = 0;
+    const s = setup({
+      model: async () => {
+        calls++;
+        return {
+          text: JSON.stringify({
+            turns: [
+              { speaker: 'A', text: 'You build payments too?' },
+              { speaker: 'B', text: 'Yes, for clinics.' },
+            ],
+            reason: 'Both build payments.',
+            opener: 'Ask Bob about clinic billing.',
+          }),
+        };
+      },
+    });
+    const id = await room(s, [alice, bob]);
+    await s.call(alice, 'POST', `/events/${id}/swipe`, { to: bob.id, like: true });
+    await s.call(bob, 'POST', `/events/${id}/swipe`, { to: alice.id, like: true });
+    const first = await s.call(alice, 'GET', `/events/${id}/matches/${encodeURIComponent(bob.id)}`);
+    expect(first.body.exchange).toMatchObject({ source: 'llm', opener: 'Ask Bob about clinic billing.' });
+    const second = await s.call(bob, 'GET', `/events/${id}/matches/${encodeURIComponent(alice.id)}`);
+    expect(second.body.exchange).toEqual(first.body.exchange);
+    expect(calls).toBe(1);
+  });
+});
+
+describe('alerts and messages', () => {
+  const matched = async (s: ReturnType<typeof setup>) => {
+    const id = await room(s, [alice, bob, carol]);
+    await s.call(alice, 'POST', `/events/${id}/swipe`, { to: bob.id, like: true });
+    await s.call(bob, 'POST', `/events/${id}/swipe`, { to: alice.id, like: true });
+    return id;
+  };
+  const talk = (s: ReturnType<typeof setup>, who: Identity, id: string, other: Identity, text: string) =>
+    s.call(who, 'POST', `/chats/${id}/${encodeURIComponent(other.id)}/messages`, { text });
+
+  it('tells the person who connected first when it becomes a match, and they can mark it read', async () => {
+    const s = setup();
+    const id = await matched(s);
+    // Bob's Connect made the match, so he already saw it. Alice connected first and hears about it.
+    expect((await s.call(alice, 'GET', '/alerts')).body).toMatchObject({
+      unread: 1,
+      items: [{ eventId: id, other: bob.id, name: 'bob', kind: 'match', alertUnread: true }],
+    });
+    expect((await s.call(bob, 'GET', '/alerts')).body.unread).toBe(0);
+    await s.call(alice, 'POST', '/alerts/read');
+    expect((await s.call(alice, 'GET', '/alerts')).body.unread).toBe(0);
+  });
+
+  it('sends messages between matched people, and marks them unread for the other', async () => {
+    const s = setup();
+    const id = await matched(s);
+    const sent = await talk(s, alice, id, bob, '  Coffee tomorrow?  ');
+    expect(sent.status).toBe(200);
+    expect(sent.body.message).toMatchObject({ mine: true, text: 'Coffee tomorrow?' });
+    expect((await s.call(bob, 'GET', '/chats')).body).toMatchObject({
+      unread: 1,
+      items: [{ other: alice.id, chatUnread: true, preview: 'Coffee tomorrow?' }],
+    });
+    expect((await s.call(alice, 'GET', '/chats')).body.unread).toBe(0);
+
+    const thread = await s.call(bob, 'GET', `/chats/${id}/${encodeURIComponent(alice.id)}`);
+    expect(thread.body.person).toMatchObject({ uid: alice.id, name: 'alice', left: false });
+    expect(thread.body.messages).toMatchObject([{ mine: false, text: 'Coffee tomorrow?' }]);
+    expect((await s.call(bob, 'GET', '/chats')).body.unread).toBe(0);
+    const aliceThread = await s.call(alice, 'GET', `/chats/${id}/${encodeURIComponent(bob.id)}`);
+    expect(aliceThread.body.messages[0].mine).toBe(true);
+  });
+
+  it('only lets matched people talk, and not once either side has blocked the other', async () => {
+    const s = setup();
+    const id = await matched(s);
+    expect((await talk(s, carol, id, bob, 'hi')).status).toBe(404);
+    expect((await talk(s, alice, id, bob, 'x'.repeat(501))).status).toBe(400);
+    expect((await talk(s, guest, id, bob, 'hi')).body.needsLogin).toBe(true);
+    await s.call(bob, 'POST', '/block', { uid: alice.id });
+    expect((await talk(s, alice, id, bob, 'hi')).status).toBe(404);
+    expect((await s.call(bob, 'GET', `/chats/${id}/${encodeURIComponent(alice.id)}`)).status).toBe(404);
+    expect((await s.call(alice, 'GET', '/chats')).body.items).toEqual([]);
+  });
+
+  it('deleting an account takes its matches and messages away from the other side too', async () => {
+    const s = setup();
+    const id = await matched(s);
+    await talk(s, alice, id, bob, 'hi');
+    await s.call(alice, 'DELETE', '/me');
+    expect((await s.call(bob, 'GET', '/chats')).body.items).toEqual([]);
+    expect((await s.call(bob, 'GET', `/events/${id}`)).body.matches).toEqual([]);
+    expect([...s.store.items.values()].filter((i) => i.pk.startsWith('CHAT#'))).toHaveLength(0);
+  });
+});
+
+describe('connections', () => {
+  // Both people Connect, which makes a match in that event.
+  const connectAt = async (s: ReturnType<typeof setup>, id: string, a: Identity, b: Identity) => {
+    await s.call(a, 'POST', `/events/${id}/swipe`, { to: b.id, like: true });
+    return (await s.call(b, 'POST', `/events/${id}/swipe`, { to: a.id, like: true })).body.match;
+  };
+
+  it('lists who I connected with, with contact details, and nobody else', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob, carol]);
+    expect(await connectAt(s, id, alice, bob)).toBe(true);
+
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([
+      expect.objectContaining({
+        uid: bob.id,
+        displayName: 'bob',
+        eventId: id,
+        eventName: 'Founders night',
+        contact: expect.objectContaining({ linkedin: 'linkedin.com/in/bob' }),
+      }),
+    ]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items.map((c: any) => c.uid)).toEqual([alice.id]);
+    expect((await s.call(carol, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('carries over to a later event, where that person is shown as connected and not suggested', async () => {
+    const s = setup();
+    const first = await room(s, [alice, bob]);
+    await connectAt(s, first, alice, bob);
+
+    const second = await room(s, [alice, bob, carol]);
+    const view = (await s.call(alice, 'GET', `/events/${second}`)).body;
+    expect(view.connected).toEqual([expect.objectContaining({ uid: bob.id, eventId: first })]);
+    expect(view.people.map((p: any) => p.uid).sort()).toEqual([bob.id, carol.id].sort());
+    const picks = (await s.call(alice, 'POST', `/events/${second}/scout`)).body.picks;
+    expect(picks.map((p: any) => p.uid)).toEqual([carol.id]);
+  });
+
+  it('is left out for people who have blocked me, or whom I have blocked', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob]);
+    await connectAt(s, id, alice, bob);
+    await s.call(bob, 'POST', '/block', { uid: alice.id });
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('forgets a connection when the event it was made at is deleted, but keeps one from a later event', async () => {
+    const s = setup({ adminIds: [alice.id] });
+    const first = await room(s, [alice, bob]);
+    await connectAt(s, first, alice, bob);
+    const second = await room(s, [alice, bob]);
+    await connectAt(s, second, alice, bob);
+
+    await s.call(alice, 'DELETE', `/admin/events/${first}`);
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([
+      expect.objectContaining({ uid: bob.id, eventId: second }),
+    ]);
+
+    await s.call(alice, 'DELETE', `/admin/events/${second}`);
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+    expect((await s.call(bob, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('goes on both sides when someone deletes their account', async () => {
+    const s = setup();
+    const id = await room(s, [alice, bob]);
+    await connectAt(s, id, alice, bob);
+    await s.call(bob, 'DELETE', '/me');
+    expect((await s.call(alice, 'GET', '/connections')).body.items).toEqual([]);
+  });
+
+  it('is only for people who are signed in', async () => {
+    const s = setup();
+    expect((await s.call(guest, 'GET', '/connections')).status).toBe(403);
+  });
+});
+
+describe('profile photos', () => {
+  const photoBaseUrl = 'https://photos.example.test';
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0]).toString('base64');
+  const photoStore = () => {
+    const files = new Map<string, Uint8Array>();
+    return {
+      files,
+      photos: {
+        put: async (key: string, bytes: Uint8Array) => void files.set(key, bytes),
+        remove: async (key: string) => void files.delete(key),
+      },
+    };
+  };
+
+  it('stores an upload, shows it on the card, and replaces the old one', async () => {
+    const p = photoStore();
+    const s = setup({ photos: p.photos, photoBaseUrl });
+    const id = await room(s, [alice, bob]);
+    const first = await s.call(bob, 'POST', '/me/photo', { image: jpeg, type: 'image/jpeg' });
+    expect(first.status).toBe(200);
+    expect(first.body.photoURL).toMatch(/^https:\/\/photos\.example\.test\/photos\/.+\.jpg$/);
+    expect((await s.call(alice, 'GET', `/events/${id}`)).body.people[0].photoURL).toBe(first.body.photoURL);
+
+    // Saving the rest of the profile keeps the upload, because the link is the same.
+    await s.call(bob, 'PUT', '/me', profile('bob', { photoURL: first.body.photoURL }));
+    expect(p.files.size).toBe(1);
+
+    await s.call(bob, 'POST', '/me/photo', { image: jpeg, type: 'image/jpeg' });
+    expect(p.files.size).toBe(1);
+    expect((await s.call(bob, 'GET', '/me')).body.profile.photoURL).not.toBe(first.body.photoURL);
+  });
+
+  it('refuses files that are not images, and photo links from other sites', async () => {
+    const p = photoStore();
+    const s = setup({ photos: p.photos, photoBaseUrl });
+    await s.call(bob, 'PUT', '/me', profile('bob'));
+    expect((await s.call(bob, 'POST', '/me/photo', { image: Buffer.from('hello').toString('base64'), type: 'image/jpeg' })).status).toBe(400);
+    expect((await s.call(bob, 'PUT', '/me', profile('bob', { photoURL: 'https://tracker.example.com/a.jpg' }))).status).toBe(400);
+    expect((await s.call(bob, 'PUT', '/me', profile('bob', { photoURL: 'https://lh3.googleusercontent.com/a/x' }))).status).toBe(200);
+    expect(p.files.size).toBe(0);
+  });
+
+  it('says so when photos are not set up', async () => {
+    const s = setup();
+    await s.call(bob, 'PUT', '/me', profile('bob'));
+    expect((await s.call(bob, 'POST', '/me/photo', { image: jpeg, type: 'image/jpeg' })).status).toBe(503);
   });
 });

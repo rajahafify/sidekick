@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sidekick/logic/geo_when.dart';
+import 'package:sidekick/logic/image.dart';
 import 'package:sidekick/logic/sidekick.dart';
 import 'package:sidekick/models.dart';
 
@@ -48,10 +49,12 @@ void main() {
       expect(formatDistance(1345), '1.3 km');
       expect(formatDistance(25000), '25 km');
     });
-    test('gives a fuzzy fix the benefit of the doubt', () {
-      expect(insideFence(const Fix(3.16, 101.7116, 20), klcc), isTrue);
-      expect(insideFence(const Fix(3.17, 101.7116, 20), klcc), isFalse);
-      expect(insideFence(const Fix(3.17, 101.7116, 900), klcc), isTrue);
+    test('knows the image types a profile photo can be', () {
+      expect(imageType([0xff, 0xd8, 0xff, 0xe0, 0, 16]), 'image/jpeg');
+      expect(imageType([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), 'image/png');
+      expect(imageType([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]), 'image/webp');
+      expect(imageType('<html>'.codeUnits), isNull);
+      expect(imageType(const []), isNull);
     });
   });
 

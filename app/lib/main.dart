@@ -8,6 +8,7 @@ import 'config.dart';
 import 'data/session.dart';
 import 'models.dart';
 import 'screens/admin.dart';
+import 'screens/chat.dart';
 import 'screens/check_in.dart';
 import 'screens/event.dart';
 import 'screens/home.dart';
@@ -196,10 +197,17 @@ GoRouter _router(Session session) => GoRouter(
         GoRoute(path: '/offline', builder: (_, _) => const OfflineScreen()),
         GoRoute(path: '/profile', builder: (_, s) => ProfileScreen(next: s.uri.queryParameters['next'])),
         GoRoute(path: '/', builder: (_, _) => const HomeShell(tab: 0)),
-        GoRoute(path: '/places', builder: (_, _) => const HomeShell(tab: 1)),
-        GoRoute(path: '/me', builder: (_, _) => const HomeShell(tab: 2)),
+        GoRoute(path: '/messages', builder: (_, _) => const HomeShell(tab: 1)),
+        GoRoute(path: '/places', builder: (_, _) => const HomeShell(tab: 2)),
+        GoRoute(path: '/alerts', builder: (_, _) => const HomeShell(tab: 3)),
+        GoRoute(path: '/me', builder: (_, _) => const HomeShell(tab: 4)),
+        GoRoute(path: '/connected', builder: (_, _) => const HomeShell(tab: 5)),
         GoRoute(path: '/checkin', builder: (_, _) => const CheckInScreen()),
         GoRoute(path: '/new', builder: (_, _) => const NewEventScreen()),
+        GoRoute(
+          path: '/chat/:id/:uid',
+          builder: (_, s) => ChatScreen(eventId: s.pathParameters['id']!, other: s.pathParameters['uid']!),
+        ),
         GoRoute(
           path: '/e/:id',
           builder: (_, s) => EventScreen(
