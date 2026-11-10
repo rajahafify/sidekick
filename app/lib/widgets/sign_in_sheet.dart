@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/identity.dart';
 import '../theme.dart';
+import 'dots.dart';
 import 'google_button.dart';
 import 'ui.dart';
 
@@ -36,6 +37,8 @@ class _SignInSheetState extends State<_SignInSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Align(alignment: Alignment.centerLeft, child: SidekickMark(size: 30, mood: BuddyMood.wink)),
+            const SizedBox(height: 16),
             Text('Sign in to connect', style: displayStyle(34)),
             const SizedBox(height: 10),
             Text(

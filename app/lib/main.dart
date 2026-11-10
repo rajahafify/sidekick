@@ -17,6 +17,7 @@ import 'screens/new_event.dart';
 import 'screens/profile.dart';
 import 'screens/welcome.dart';
 import 'theme.dart';
+import 'widgets/dots.dart';
 import 'widgets/ui.dart';
 
 Future<void> main() async {
@@ -191,7 +192,7 @@ GoRouter _router(Session session) => GoRouter(
         return null;
       },
       routes: [
-        GoRoute(path: '/loading', builder: (_, _) => const Scaffold(body: Loading())),
+        GoRoute(path: '/loading', builder: (_, _) => const Scaffold(body: _Splash())),
         GoRoute(path: '/admin', builder: (_, _) => const AdminScreen()),
         GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
         GoRoute(path: '/offline', builder: (_, _) => const OfflineScreen()),
@@ -206,7 +207,11 @@ GoRouter _router(Session session) => GoRouter(
         GoRoute(path: '/new', builder: (_, _) => const NewEventScreen()),
         GoRoute(
           path: '/chat/:id/:uid',
-          builder: (_, s) => ChatScreen(eventId: s.pathParameters['id']!, other: s.pathParameters['uid']!),
+          builder: (_, s) => ChatScreen(
+            eventId: s.pathParameters['id']!,
+            other: s.pathParameters['uid']!,
+            draft: s.uri.queryParameters['draft'],
+          ),
         ),
         GoRoute(
           path: '/e/:id',
@@ -223,10 +228,47 @@ GoRouter _router(Session session) => GoRouter(
           ],
         ),
       ],
-      errorBuilder: (_, _) => const Scaffold(
-        body: EmptyState(title: 'Nothing here', text: 'That link doesn’t go anywhere in Sidekick.'),
+      errorBuilder: (context, _) => Scaffold(
+        body: Center(
+          child: EmptyState(
+            mood: BuddyMood.normal,
+            title: 'Nothing here',
+            text: 'That link doesn’t go anywhere in Sidekick.',
+            action: OutlinedButton(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(160, 50)),
+              onPressed: () => context.go('/'),
+              child: const Text('Go home'),
+            ),
+          ),
+        ),
       ),
     );
+
+/// While the app works out who's here: Buddy, breathing.
+class _Splash extends StatefulWidget {
+  const _Splash();
+  @override
+  State<_Splash> createState() => _SplashState();
+}
+
+class _SplashState extends State<_Splash> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: ScaleTransition(
+          scale: Tween(begin: 0.92, end: 1.0).animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+          child: const SidekickMark(size: 56),
+        ),
+      );
+}
 
 class _NotConfigured extends StatelessWidget {
   const _NotConfigured();

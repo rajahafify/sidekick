@@ -96,3 +96,23 @@ Exchange templateExchange(Card one, Card two) {
 
 /// Stable id for a match between two people: smaller uid first.
 String matchId(String a, String b) => a.compareTo(b) < 0 ? '${a}_$b' : '${b}_$a';
+
+/// How good a pick is, in two words.
+String fitLabel(int score) {
+  if (score >= 70) return 'Strong fit';
+  if (score >= 40) return 'Good fit';
+  return 'Worth a hello';
+}
+
+/// One line from the sidekick about the room: how many people it has read for you, and how many
+/// of them stand out.
+String roomBriefing({required int scouted, required int strong, required bool scouting}) {
+  if (scouted == 0) return scouting ? 'Scouting the room…' : 'Nobody new to scout yet.';
+  final people = scouted == 1 ? '1 person' : '$scouted people';
+  final tail = switch (strong) {
+    0 => 'Best fit first.',
+    1 => '1 strong fit, shown first.',
+    _ => '$strong strong fits, shown first.',
+  };
+  return '${scouting ? 'Still reading' : 'Read'} $people for you. $tail';
+}

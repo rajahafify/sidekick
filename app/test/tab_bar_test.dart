@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sidekick/screens/home.dart';
 import 'package:sidekick/theme.dart';
 
-/// Pumps the bottom bar alone, on a phone [width] logical pixels wide.
+/// Pumps the floating bottom bar alone, on a phone [width] logical pixels wide.
 Future<void> pumpTabBar(WidgetTester tester, double width) async {
   tester.view.physicalSize = Size(width, 640);
   tester.view.devicePixelRatio = 1;
@@ -15,7 +15,7 @@ Future<void> pumpTabBar(WidgetTester tester, double width) async {
       theme: buildTheme(Palette.light),
       home: const Scaffold(
         body: SizedBox.shrink(),
-        bottomNavigationBar: HomeTabBar(tab: 0, messages: 2, alerts: 1),
+        bottomNavigationBar: HomeTabBar(tab: 0, messages: 2),
       ),
     ),
   );
@@ -34,7 +34,7 @@ void main() {
       expect(plus.center.dx, closeTo(width / 2, 1));
 
       final tabs = [
-        for (final label in ['Events', 'Connected', 'Messages', 'Alerts', 'You']) tapArea(tester, find.text(label)),
+        for (final label in ['Events', 'People', 'Messages', 'You']) tapArea(tester, find.text(label)),
       ];
       for (var i = 0; i < tabs.length; i++) {
         expect(tabs[i].overlaps(plus), isFalse, reason: 'tab $i overlaps the +');

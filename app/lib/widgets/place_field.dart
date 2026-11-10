@@ -39,6 +39,7 @@ class _PlaceFieldState extends State<PlaceField> {
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
       final api = SessionScope.of(context).api;
       final s = await api.placeSuggestions(v.trim());
       if (mounted && widget.controller.text == v) setState(() => suggestions = s);
@@ -64,10 +65,12 @@ class _PlaceFieldState extends State<PlaceField> {
           if (suggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 6),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: C.surface,
+                color: C.paper,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: C.line),
+                boxShadow: [BoxShadow(color: C.shadow, blurRadius: 18, offset: const Offset(0, 6))],
               ),
               child: Column(
                 children: [

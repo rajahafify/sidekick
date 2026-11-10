@@ -47,6 +47,9 @@ class _NewEventScreenState extends State<NewEventScreen> {
     });
     try {
       final e = await SessionScope.of(context).api.importEvent(url.startsWith('http') ? url : 'https://$url');
+      if (!mounted) return;
+      FocusScope.of(context).unfocus();
+      toast(context, 'Filled in from the link. Check it, then add it.');
       setState(() {
         name.text = e.name;
         if (e.place.isNotEmpty) place.text = e.place.length > 140 ? e.place.substring(0, 140) : e.place;
@@ -55,7 +58,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
         sourceUrl = e.url;
       });
     } on ApiError catch (e) {
-      setState(() => importError = e.message);
+      if (mounted) setState(() => importError = e.message);
     } finally {
       if (mounted) setState(() => importing = false);
     }
@@ -101,7 +104,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
       });
       if (mounted) context.pushReplacement('/e/$id?share=1');
     } on ApiError catch (e) {
-      setState(() => error = e.message);
+      if (mounted) setState(() => error = e.message);
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -109,16 +112,17 @@ class _NewEventScreenState extends State<NewEventScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(),
+        appBar: const BackBar(),
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 40),
           children: [
-            Text('Add an event', style: displayStyle(40)),
-            const SizedBox(height: 8),
-            Text('Add it once, and everyone who opens the link or scans the QR code joins the same room.',
-                style: TextStyle(color: C.muted, fontSize: 16, height: 1.45)),
-            const SizedBox(height: 22),
+            const PageTitle(
+              'Add an event',
+              text: 'Add it once. Everyone who opens its link or scans its code lands in the same room.',
+            ),
+            const SizedBox(height: 24),
             SurfaceCard(
+              color: C.goSoft,
               padding: const EdgeInsets.all(18),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Row(children: [
@@ -134,15 +138,15 @@ class _NewEventScreenState extends State<NewEventScreen> {
                     child: TextField(
                       controller: link,
                       keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(hintText: 'Paste the event link'),
+                      decoration: InputDecoration(hintText: 'Paste the event link', fillColor: C.paper),
                       onSubmitted: (_) => _import(),
                     ),
                   ),
                   const SizedBox(width: 10),
                   SizedBox(
-                    height: 56,
+                    height: 54,
                     child: FilledButton(
-                      style: FilledButton.styleFrom(minimumSize: const Size(88, 56)),
+                      style: FilledButton.styleFrom(minimumSize: const Size(92, 54)),
                       onPressed: importing ? null : _import,
                       child: importing ? const ButtonProgress() : const Text('Import'),
                     ),
@@ -188,10 +192,13 @@ class _NewEventScreenState extends State<NewEventScreen> {
                 ),
               ),
             ]),
-            if (picked?.lat != null)
+            if (start == null)
               Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text('People will need to be at this place to check in.', style: TextStyle(color: C.muted, fontSize: 13)),
+                padding: const EdgeInsets.only(top: 10, left: 4),
+                child: Text(
+                  'Add a start time so people know when the room opens.',
+                  style: TextStyle(color: C.muted, fontSize: 13),
+                ),
               ),
             ErrorNote(error),
             const SizedBox(height: 24),
@@ -214,7 +221,12 @@ class _WhenButton extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label, style: TextStyle(color: C.muted, fontSize: 13)),
           const SizedBox(height: 4),
-          Text(value == null ? 'Set' : eventWhen(value, null), style: const TextStyle(fontSize: 15)),
+          Text(
+            value == null ? 'Set a time' : eventWhen(value, null),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: value == null ? C.muted : C.ink),
+          ),
         ]),
       );
 }

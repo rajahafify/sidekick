@@ -15,7 +15,7 @@ import '../widgets/ui.dart';
 class CheckInScreen extends StatelessWidget {
   const CheckInScreen({super.key});
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(), body: const CheckInView(showHeader: false));
+  Widget build(BuildContext context) => const Scaffold(appBar: BackBar(), body: CheckInView(showHeader: false));
 }
 
 class CheckInView extends StatefulWidget {
@@ -56,6 +56,7 @@ class _CheckInViewState extends State<CheckInView> {
     }
     final list = await SessionScope.of(context).api.nearby(here.lat, here.lng);
     if (!mounted) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       fix = here;
       nearby = list;
@@ -90,7 +91,15 @@ class _CheckInViewState extends State<CheckInView> {
         'day': '${now.year}${two(now.month)}${two(now.day)}',
         'dayStart': dayStart.toUtc().toIso8601String(),
       });
-      if (mounted) context.push('/e/$id');
+      if (mounted) {
+        // The room opens checked in, and the form is clean for next time.
+        place.clear();
+        setState(() {
+          picked = null;
+          nearby = null;
+        });
+        context.push('/e/$id');
+      }
     } on ApiError catch (e) {
       if (mounted) setState(() => error = e.message);
     } finally {
@@ -100,61 +109,66 @@ class _CheckInViewState extends State<CheckInView> {
 
   @override
   Widget build(BuildContext context) => SafeArea(
+        bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 130),
           children: [
             if (widget.showHeader) ...[
-              const Align(alignment: Alignment.centerLeft, child: Wordmark()),
+              const SizedBox(height: 42, child: Align(alignment: Alignment.centerLeft, child: Wordmark())),
               const SizedBox(height: 30),
             ],
-            Text('Check in to a place', style: displayStyle(40)),
-            const SizedBox(height: 10),
-            Text(
-              'At a coworking space, a café or a venue with no event page? Check in, and your sidekick scouts '
-              'everyone else checked in there today.',
-              style: TextStyle(color: C.muted, fontSize: 16, height: 1.4),
+            const PageTitle(
+              'Check in to a place',
+              text: 'At a coworking space, a café or a venue with no event page? Check in, and your sidekick '
+                  'scouts everyone else who checked in there today.',
             ),
-            const SizedBox(height: 22),
-            OutlinedButton.icon(
-              onPressed: locating ? null : _findNearby,
-              icon: locating
-                  ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
-                  : Icon(Icons.my_location, color: C.go),
-              label: Text(locating ? 'Finding places near you…' : 'Use my location'),
-            ),
-            if (nearby != null && nearby!.isEmpty)
-              Padding(
-                padding: EdgeInsets.only(top: 12),
-                child: Text('No places found nearby. Type the name below.', style: TextStyle(color: C.muted)),
-              ),
-            if (nearby != null && nearby!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SurfaceCard(
-                padding: EdgeInsets.zero,
-                child: Column(children: [
-                  for (final p in nearby!)
-                    ListTile(
-                      title: Text(p.name),
-                      subtitle: Text(
-                        [
-                          if (fix != null && p.lat != null)
-                            formatDistance(distanceM(fix!, LatLng(p.lat!, p.lng!))),
-                          p.address,
-                        ].where((s) => s.isNotEmpty).join(' · '),
-                        style: TextStyle(color: C.muted),
-                      ),
-                      onTap: () => _pick(p),
-                    ),
-                ]),
-              ),
-            ],
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             PlaceField(
               controller: place,
               label: 'Where are you?',
               hint: 'Common Ground, Bukit Bintang',
               onPicked: (p) => setState(() => picked = p),
             ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: locating ? null : _findNearby,
+                icon: locating
+                    ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: C.ink))
+                    : Icon(Icons.near_me_outlined, size: 18, color: C.ink),
+                label: Text(locating ? 'Finding places near you…' : 'Find places near me'),
+              ),
+            ),
+            if (nearby != null && nearby!.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 12),
+                child: Text('No places found nearby. Type the name above.', style: TextStyle(color: C.muted)),
+              ),
+            if (nearby != null && nearby!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SurfaceCard(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(children: [
+                  for (final p in nearby!)
+                    ListTile(
+                      leading: Icon(Icons.place_outlined, color: C.muted, size: 21),
+                      title: Text(p.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                      subtitle: Text(
+                        [
+                          if (fix != null && p.lat != null)
+                            formatDistance(distanceM(fix!, LatLng(p.lat!, p.lng!))),
+                          p.address,
+                        ].where((s) => s.isNotEmpty).join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: C.muted, fontSize: 13.5),
+                      ),
+                      onTap: () => _pick(p),
+                    ),
+                ]),
+              ),
+            ],
             ErrorNote(error),
             const SizedBox(height: 18),
             ValueListenableBuilder(
@@ -164,13 +178,16 @@ class _CheckInViewState extends State<CheckInView> {
                 child: pending ? const ButtonProgress() : const Text('Check in here'),
               ),
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 14),
             Center(
               child: TextButton(
                 onPressed: () => context.push('/new'),
                 child: Text.rich(TextSpan(children: [
-                  TextSpan(text: 'Going to an event instead? ', style: TextStyle(color: C.muted)),
-                  TextSpan(text: 'Add the event', style: TextStyle(color: C.go, fontWeight: FontWeight.w500)),
+                  TextSpan(text: 'Going to an event instead? ', style: TextStyle(color: C.muted, fontWeight: FontWeight.w400)),
+                  TextSpan(
+                    text: 'Add the event',
+                    style: TextStyle(color: C.ink, fontWeight: FontWeight.w600, decoration: TextDecoration.underline),
+                  ),
                 ])),
               ),
             ),
