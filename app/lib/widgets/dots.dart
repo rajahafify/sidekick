@@ -65,13 +65,14 @@ double _ellipse(Offset p, Offset c, double rx, double ry) {
 }
 
 /// A studio-style head-and-shoulders portrait, different for each person (seeded by their id),
-/// used until people have photos.
+/// used until people have photos. Drawn light on dark: the face is the brightest thing, hair and
+/// shoulders are mid grey, and the room behind falls away to black.
 DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
   final h = seed.codeUnits.fold<int>(7, (a, c) => (a * 31 + c) & 0x7fffffff);
   final lightLeft = h.isEven;
-  final hair = (h >> 1) % 3; // 0 none, 1 short, 2 long
+  final hair = (h >> 1) % 3; // 0 cropped, 1 short, 2 long
   final shift = ((h >> 3) % 7 - 3) * 0.012;
-  final bg = 0.16 + ((h >> 6) % 4) * 0.05;
+  final bg = 0.07 + ((h >> 6) % 4) * 0.03;
   return (p, s) {
     final u = math.min(s.width, s.height) * scale;
     final c = Offset(s.width * (0.5 + shift), s.height * headY);
@@ -79,27 +80,31 @@ DotField portraitField(String seed, {double headY = 0.42, double scale = 1}) {
     final light = Offset(s.width * (0.5 + 0.35 * dir), s.height * 0.1);
     // Background: a soft spotlight from the lit side.
     var v = bg * (1 - ((p - light).distance / (s.longestSide * 0.9))).clamp(0.0, 1.0);
-    // Shoulders, with a rim of light on one side.
-    final sh = _ellipse(p, c.translate(0, u * 0.7), u * 0.52, u * 0.36);
-    if (sh < 1 && p.dy > c.dy + u * 0.36) {
-      final side = ((p.dx - c.dx) / (u * 0.52)) * dir;
-      v = 0.2 + 0.4 * ((side + 1) / 2).clamp(0.0, 1.0) * (0.4 + 0.6 * math.sqrt(sh));
+    // Shoulders, brighter on the lit side.
+    final sh = _ellipse(p, c.translate(0, u * 0.8), u * 0.5, u * 0.44);
+    if (sh < 1 && p.dy > c.dy + u * 0.3) {
+      final side = ((p.dx - c.dx) / (u * 0.5)) * dir;
+      v = 0.3 + 0.2 * ((side + 1) / 2).clamp(0.0, 1.0);
     }
     // Neck, in shadow under the chin.
-    if ((p.dx - c.dx).abs() < u * 0.1 && p.dy > c.dy + u * 0.12 && p.dy < c.dy + u * 0.42) {
-      v = 0.28 + 0.2 * (((p.dx - c.dx) / (u * 0.1)) * dir).clamp(0.0, 1.0);
+    if ((p.dx - c.dx).abs() < u * 0.085 && p.dy > c.dy + u * 0.12 && p.dy < c.dy + u * 0.42) {
+      v = 0.42 + 0.14 * (((p.dx - c.dx) / (u * 0.085)) * dir).clamp(-1.0, 1.0);
+    }
+    // Long hair falls behind the head and neck.
+    if (hair == 2 && _ellipse(p, c.translate(0, u * 0.07), u * 0.235, u * 0.31) < 1 && p.dy < c.dy + u * 0.34) {
+      v = math.max(v, 0.36);
     }
     // Head, lit from one side.
-    final hd = _ellipse(p, c, u * 0.18, u * 0.235);
+    final hd = _ellipse(p, c, u * 0.165, u * 0.21);
     if (hd < 1) {
-      final side = ((p.dx - c.dx) / (u * 0.18)) * dir;
-      v = 0.5 + 0.45 * side.clamp(-1.0, 1.0) * 0.6 + 0.25 * (1 - hd);
+      final side = ((p.dx - c.dx) / (u * 0.165)) * dir;
+      v = (0.8 + 0.16 * side.clamp(-1.0, 1.0) + 0.06 * (1 - hd)).clamp(0.0, 1.0);
     }
-    // Hair.
-    final cap = _ellipse(p, c.translate(0, -u * 0.07), u * 0.2, u * 0.21) < 1 && p.dy < c.dy - u * 0.08;
-    final longHair = _ellipse(p, c.translate(0, u * 0.06), u * 0.25, u * 0.33) < 1;
-    if (hair == 2 && longHair && hd >= 1 && p.dy < c.dy + u * 0.32) v = 0.1;
-    if (hair > 0 && cap) v = 0.1 + 0.12 * (((p.dx - c.dx) / (u * 0.2)) * dir).clamp(0.0, 1.0);
+    // Hair on top: mid grey, so it reads against both the face and the dark behind.
+    final crown = hair == 0 ? 0.13 : 0.1;
+    if (_ellipse(p, c.translate(0, -u * 0.02), u * 0.18, u * 0.225) < 1 && p.dy < c.dy - u * crown) {
+      v = 0.44 + 0.1 * (((p.dx - c.dx) / (u * 0.18)) * dir).clamp(-1.0, 1.0);
+    }
     return v;
   };
 }
@@ -207,4 +212,31 @@ class BuddyPainter extends CustomPainter {
   @override
   bool shouldRepaint(BuddyPainter old) =>
       old.color != color || old.features != features || old.cheeks != cheeks || old.mood != mood;
+}
+
+/// A dim room with a lit stage and the heads of a crowd: the picture on an event's poster,
+/// a little different for each event (seeded by its id).
+DotField roomField(String seed) {
+  final h = seed.codeUnits.fold<int>(11, (a, c) => (a * 31 + c) & 0x7fffffff);
+  final lx = 0.3 + (h % 40) / 100.0;
+  final lean = ((h >> 5) % 5 - 2) * 0.09;
+  final heads = 5 + (h >> 9) % 3;
+  return (p, s) {
+    final x = p.dx / s.width, y = p.dy / s.height;
+    // The beam, widening as it falls.
+    final d = (x - lx - y * lean).abs();
+    var v = (1 - d / (0.1 + y * 0.42)).clamp(0.0, 1.0) * (1 - y * 0.55) * 0.95;
+    // A second, fainter light from the other side.
+    final d2 = (x - (1 - lx) + y * lean * 0.6).abs();
+    v = math.max(v, (1 - d2 / (0.06 + y * 0.3)).clamp(0.0, 1.0) * (1 - y * 0.7) * 0.4);
+    // The crowd: dark heads along the bottom edge, with a rim of light.
+    for (var i = 0; i < heads; i++) {
+      final cx = (i + 0.5 + ((h >> (i + 2)) % 5 - 2) * 0.06) / heads;
+      final cy = 0.98 - ((h >> (i + 4)) % 4) * 0.035;
+      final r = s.width / heads * 0.36;
+      final dist = (Offset(cx * s.width, cy * s.height) - p).distance / r;
+      if (dist < 1) v = dist > 0.82 ? math.max(v, 0.5) : 0.04;
+    }
+    return v;
+  };
 }

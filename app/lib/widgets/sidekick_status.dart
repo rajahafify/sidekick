@@ -90,7 +90,7 @@ class _SidekickStatusCardState extends State<SidekickStatusCard> {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (state) {
-      _State.working => ('Working', C.go),
+      _State.working => ('Working', C.ink),
       _State.down => ('Not answering', C.danger),
       _State.off => ('Off', C.muted),
       _State.unknown => ('Not checked', C.muted),
@@ -100,7 +100,7 @@ class _SidekickStatusCardState extends State<SidekickStatusCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Expanded(child: Text('YOUR SIDEKICK', style: eyebrow)),
+            Expanded(child: Text('THE SIDEKICK’S MODEL', style: eyebrow)),
             Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),

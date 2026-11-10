@@ -105,10 +105,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       behavior: ScrollConfiguration.of(context).copyWith(
                         dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse, PointerDeviceKind.trackpad},
                       ),
-                      child: PageView(
-                        controller: _pages,
-                        onPageChanged: (i) => setState(() => page = i),
-                        children: slides,
+                      // The slides move on their own only until someone touches them.
+                      child: Listener(
+                        onPointerDown: (_) => _auto.cancel(),
+                        child: PageView(
+                          controller: _pages,
+                          onPageChanged: (i) => setState(() => page = i),
+                          children: slides,
+                        ),
                       ),
                     ),
                   ),
@@ -116,14 +120,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     for (var i = 0; i < slides.length; i++)
                       GestureDetector(
-                        onTap: () => _pages.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+                        onTap: () {
+                          _auto.cancel();
+                          _pages.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+                        },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           margin: const EdgeInsets.symmetric(horizontal: 4),
                           width: i == page ? 26 : 7,
                           height: 7,
                           decoration: BoxDecoration(
-                            color: i == page ? C.go : C.line,
+                            color: i == page ? C.ink : C.line,
                             borderRadius: BorderRadius.circular(9),
                           ),
                         ),
@@ -140,7 +147,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   OutlinedButton(
                     onPressed: busy != null ? null : () => _run('guest', session.continueAsGuest),
                     child: busy == 'guest'
-                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: C.go))
+                        ? ButtonProgress(color: C.ink)
                         : const Text('Continue as guest'),
                   ),
                   ErrorNote(error),
@@ -214,8 +221,7 @@ class _FigCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: C.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: C.line),
+            borderRadius: BorderRadius.circular(28),
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(children: [
@@ -425,19 +431,9 @@ class _Notes extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget note(String who, String text) => Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: C.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: C.line),
-          ),
+          decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(22)),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 42,
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: C.soft, shape: BoxShape.circle, border: Border.all(color: C.line)),
-              child: Text(who, style: displayStyle(17, color: C.go, style: FontStyle.italic)),
-            ),
+            Avatar(name: who, seed: who, size: 56),
             const SizedBox(width: 12),
             Expanded(
               child: Container(
@@ -455,9 +451,9 @@ class _Notes extends StatelessWidget {
     return AspectRatio(
       aspectRatio: 1.25,
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Padding(padding: const EdgeInsets.only(right: 34), child: note('AR', 'Invests in seed fintech, and you’re raising.')),
+        Padding(padding: const EdgeInsets.only(right: 34), child: note('Aisha R', 'Invests in seed fintech, and you’re raising.')),
         const SizedBox(height: 12),
-        Padding(padding: const EdgeInsets.only(left: 34), child: note('DO', 'Needs engineers. You offer engineering help.')),
+        Padding(padding: const EdgeInsets.only(left: 34), child: note('Daniel O', 'Needs engineers. You offer engineering help.')),
       ]),
     );
   }
@@ -470,16 +466,9 @@ class _MatchArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget circle(String t) => Container(
-          width: 96,
-          height: 96,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: C.surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: C.go.withValues(alpha: 0.6), width: 1.5),
-            boxShadow: [BoxShadow(color: C.go.withValues(alpha: 0.12), blurRadius: 30)],
-          ),
-          child: Text(t, style: displayStyle(30, color: C.go, style: FontStyle.italic)),
+          padding: const EdgeInsets.all(3),
+          decoration: const BoxDecoration(color: signal, shape: BoxShape.circle),
+          child: Avatar(name: t, seed: t, size: 90, ring: C.paper),
         );
     return AspectRatio(
       aspectRatio: 1.25,
@@ -489,20 +478,16 @@ class _MatchArt extends StatelessWidget {
         SizedBox(
           width: 176,
           height: 96,
-          child: Stack(children: [Positioned(left: 0, child: circle('AR')), Positioned(right: 0, child: circle('You'))]),
+          child: Stack(children: [Positioned(left: 0, child: circle('Aisha R')), Positioned(right: 0, child: circle('You, here'))]),
         ),
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-          decoration: BoxDecoration(
-            color: C.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: C.line),
-          ),
+          decoration: BoxDecoration(color: C.goSoft, borderRadius: BorderRadius.circular(20)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text('OPENER', style: eyebrow.copyWith(fontSize: 10.5)),
             const SizedBox(height: 4),
-            Text('“What made you start backing fintech?”', style: displayStyle(19)),
+            Text('“What made you start backing fintech?”', style: displayStyle(20, style: FontStyle.italic)),
           ]),
         ),
       ]),
@@ -520,9 +505,13 @@ class OfflineScreen extends StatelessWidget {
         child: Center(
           child: EmptyState(
             icon: Icons.wifi_off_rounded,
-            title: "Can't reach Sidekick",
+            title: 'Can’t reach Sidekick',
             text: session.startError ?? 'Check your connection and try again.',
-            action: FilledButton(onPressed: session.retry, child: const Text('Try again')),
+            action: FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(180, 50)),
+              onPressed: session.retry,
+              child: const Text('Try again'),
+            ),
           ),
         ),
       ),

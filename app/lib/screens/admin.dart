@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/google_button.dart';
+import '../widgets/sidekick_status.dart';
 import '../widgets/ui.dart';
 
 /// A small admin screen: open reports, every event and everyone, with delete.
@@ -241,6 +242,9 @@ class _AdminScreenState extends State<AdminScreen> {
             const SizedBox(width: 10),
             stat(2, 'People', users.length),
           ]),
+          const SizedBox(height: 22),
+          // Which model the sidekick runs on and whether it's answering: for admins, not for everyone.
+          const SidekickStatusCard(),
           const SizedBox(height: 22),
           const SectionLabel('Theme'),
           SegmentedButton<ThemeChoice>(

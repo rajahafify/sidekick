@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -7,6 +8,7 @@ import '../logic/image.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/dots.dart';
 import '../widgets/ui.dart';
 
 /// Your profile: what your sidekick tells other sidekicks, and your contact details, which are
@@ -126,14 +128,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final session = SessionScope.of(context);
     final first = session.profile?.onboarded != true;
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: !first,
-        title: Text(first ? '' : 'Your profile'),
-        actions: [
-          if (first)
-            TextButton(onPressed: session.signOut, child: Text('Cancel', style: TextStyle(color: C.muted))),
-        ],
-      ),
+      appBar: first
+          ? AppBar(
+              automaticallyImplyLeading: false,
+              toolbarHeight: 60,
+              title: const Wordmark(size: 22),
+              actions: [
+                TextButton(onPressed: session.signOut, child: Text('Cancel', style: TextStyle(color: C.muted))),
+                const SizedBox(width: 8),
+              ],
+            )
+          : const BackBar(title: Padding(padding: EdgeInsets.only(left: 12), child: Text('Your profile'))),
       // The main button stays in view, so the form never needs scrolling to reach it.
       bottomNavigationBar: SafeArea(
         top: false,
@@ -146,47 +151,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: saving ? null : _save,
               child: saving ? const ButtonProgress() : Text(first ? 'Done' : 'Save'),
             ),
+            if (first) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Only people you match with see your contact details.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: C.muted, fontSize: 12.5),
+              ),
+            ],
           ]),
         ),
       ),
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
           children: [
             if (first) ...[
-              Text('YOUR SIDEKICK', style: eyebrow),
-              const SizedBox(height: 10),
-              Text('Brief your sidekick', style: displayStyle(40)),
-              const SizedBox(height: 10),
-              Text(
-                'It uses this to find the people worth your time, and to pitch you to theirs.',
-                style: TextStyle(color: C.muted, fontSize: 16),
+              Row(children: [
+                const SidekickMark(size: 14, mood: BuddyMood.wink),
+                const SizedBox(width: 8),
+                Text('YOUR SIDEKICK', style: eyebrow),
+              ]),
+              const SizedBox(height: 12),
+              const PageTitle(
+                'Brief your sidekick',
+                text: 'It uses this to find the people worth your time, and to pitch you to theirs.',
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 26),
             ],
-            Row(children: [
-              Avatar(name: name.text, url: photo, size: 64),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: name,
-                  textCapitalization: TextCapitalization.words,
-                  maxLength: 80,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(labelText: 'Your name', counterText: ''),
-                  validator: (v) => (v ?? '').trim().isEmpty ? 'Add your name' : null,
+            Center(
+              child: Semantics(
+                button: true,
+                label: 'Change photo',
+                child: GestureDetector(
+                  onTap: uploading ? null : _changePhoto,
+                  child: Stack(clipBehavior: Clip.none, children: [
+                    Opacity(opacity: uploading ? 0.5 : 1, child: Avatar(name: name.text, url: photo, size: 104)),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: C.ink,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: C.paper, width: 3),
+                        ),
+                        child: uploading
+                            ? Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: C.onInk),
+                              )
+                            : Icon(Icons.photo_camera_outlined, size: 16, color: C.onInk),
+                      ),
+                    ),
+                  ]),
                 ),
-              ),
-            ]),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: uploading ? null : _changePhoto,
-                child: Text(uploading ? 'Uploading…' : 'Change photo'),
               ),
             ),
             const SizedBox(height: 8),
+            Center(
+              child: TextButton(
+                onPressed: uploading ? null : _changePhoto,
+                child: Text(
+                  uploading ? 'Uploading…' : (photo.isEmpty ? 'Add a photo' : 'Change photo'),
+                  style: TextStyle(color: C.muted, fontSize: 14.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: name,
+              textCapitalization: TextCapitalization.words,
+              maxLength: 80,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(labelText: 'Your name', counterText: ''),
+              validator: (v) => (v ?? '').trim().isEmpty ? 'Add your name' : null,
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: headline,
               maxLength: 100,
@@ -212,10 +256,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 alignLabelWithHint: true,
               ),
             ),
-            const SizedBox(height: 22),
-            Text('HOW TO REACH YOU', style: eyebrow),
-            const SizedBox(height: 6),
-            Text('Only shared with people you both connect with.', style: TextStyle(color: C.muted, fontSize: 14)),
+            const SizedBox(height: 30),
+            Text('HOW TO REACH YOU', style: caps),
+            const SizedBox(height: 8),
+            Row(children: [
+              Icon(Icons.lock_outline_rounded, size: 15, color: C.muted),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('Hidden until you both connect. Add at least one.', style: TextStyle(color: C.muted, fontSize: 14)),
+              ),
+            ]),
             const SizedBox(height: 14),
             TextFormField(
               controller: linkedin,
@@ -260,7 +310,10 @@ class _TagPicker extends StatelessWidget {
         children: [
           Row(children: [
             Expanded(child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600))),
-            Text('${selected.length}/$maxTags', style: TextStyle(color: C.muted, fontSize: 13)),
+            Text(
+              selected.isEmpty ? 'Pick up to $maxTags' : '${selected.length} of $maxTags',
+              style: TextStyle(color: C.muted, fontSize: 13),
+            ),
           ]),
           const SizedBox(height: 10),
           Wrap(
@@ -268,18 +321,52 @@ class _TagPicker extends StatelessWidget {
             runSpacing: 8,
             children: [
               for (final t in networkTags)
-                FilterChip(
-                  label: Text(t),
-                  selected: selected.contains(t),
-                  labelStyle: TextStyle(color: selected.contains(t) ? C.go : C.ink, fontSize: 14),
-                  side: BorderSide(color: selected.contains(t) ? C.go.withValues(alpha: 0.6) : C.line),
-                  onSelected: (on) {
+                _Choice(
+                  label: t,
+                  on: selected.contains(t),
+                  // At the limit, the rest fade: one has to come off before another goes on.
+                  enabled: selected.contains(t) || selected.length < maxTags,
+                  onTap: () {
+                    final on = !selected.contains(t);
                     if (on && selected.length >= maxTags) return;
+                    HapticFeedback.selectionClick();
                     onChanged(on ? [...selected, t] : selected.where((x) => x != t).toList());
                   },
                 ),
             ],
           ),
         ],
+      );
+}
+
+/// One tag in a picker: black when picked.
+class _Choice extends StatelessWidget {
+  const _Choice({required this.label, required this.on, required this.enabled, required this.onTap});
+  final String label;
+  final bool on;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        selected: on,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(color: on ? C.ink : C.surface, borderRadius: BorderRadius.circular(99)),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14.5,
+                height: 1.1,
+                fontWeight: on ? FontWeight.w500 : FontWeight.w400,
+                color: on ? C.onInk : (enabled ? C.ink : C.muted.withValues(alpha: 0.6)),
+              ),
+            ),
+          ),
+        ),
       );
 }
