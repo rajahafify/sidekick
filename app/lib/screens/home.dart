@@ -70,7 +70,7 @@ class _HomeShellState extends State<HomeShell> {
           index: widget.tab,
           children: const [EventsTab(), MessagesTab(), CheckInView(), AlertsTab(), MeTab(), ConnectedTab()],
         ),
-        bottomNavigationBar: _TabBar(
+        bottomNavigationBar: HomeTabBar(
           tab: widget.tab,
           // The tab you're on has just been seen, so it doesn't badge.
           messages: widget.tab == 1 ? 0 : chats,
@@ -79,17 +79,19 @@ class _HomeShellState extends State<HomeShell> {
       );
 }
 
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.tab, required this.messages, required this.alerts});
+/// The bottom bar: five tabs, with the raised + in the middle.
+class HomeTabBar extends StatelessWidget {
+  const HomeTabBar({super.key, required this.tab, required this.messages, required this.alerts});
   final int tab;
   final int messages;
   final int alerts;
 
   @override
   Widget build(BuildContext context) {
-    Widget item(int i, IconData icon, IconData active, String label, String path, {int badge = 0}) {
+    Widget item(int i, IconData icon, IconData active, String label, String path, {int flex = 2, int badge = 0}) {
       final on = tab == i;
       return Expanded(
+        flex: flex,
         child: InkWell(
           onTap: () => context.go(path),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -129,10 +131,12 @@ class _TabBar extends StatelessWidget {
           height: 68,
           child: Stack(clipBehavior: Clip.none, alignment: Alignment.center, children: [
             Row(children: [
-              item(0, Icons.calendar_today_outlined, Icons.calendar_today, 'Events', '/'),
-              item(5, Icons.people_outline, Icons.people, 'Connected', '/connected'),
-              item(1, Icons.chat_bubble_outline, Icons.chat_bubble, 'Messages', '/messages', badge: messages),
+              // Two tabs on the left and three on the right take equal width (flex 3 against 2), so the 72 px gap,
+              // and the raised + over it, sit in the middle of the bar.
+              item(0, Icons.calendar_today_outlined, Icons.calendar_today, 'Events', '/', flex: 3),
+              item(5, Icons.people_outline, Icons.people, 'Connected', '/connected', flex: 3),
               const SizedBox(width: 72),
+              item(1, Icons.chat_bubble_outline, Icons.chat_bubble, 'Messages', '/messages', badge: messages),
               item(3, Icons.notifications_none, Icons.notifications, 'Alerts', '/alerts', badge: alerts),
               item(4, Icons.person_outline, Icons.person, 'You', '/me'),
             ]),
