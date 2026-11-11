@@ -483,7 +483,7 @@ class _MatchArt extends StatelessWidget {
         const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-          decoration: BoxDecoration(color: C.goSoft, borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: C.second, borderRadius: BorderRadius.circular(20)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
             Text('OPENER', style: eyebrow.copyWith(fontSize: 10.5)),
             const SizedBox(height: 4),

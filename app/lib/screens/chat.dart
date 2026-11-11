@@ -10,7 +10,7 @@ import '../logic/sidekick.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/dots.dart';
+import '../widgets/mark.dart';
 import '../widgets/ui.dart';
 
 /// One conversation with a match. It refreshes every few seconds while it's open.
@@ -190,7 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
             if ((opener ?? '').isNotEmpty) ...[
               const SizedBox(height: 22),
               Material(
-                color: C.goSoft,
+                color: C.second,
                 borderRadius: BorderRadius.circular(20),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
@@ -277,7 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 return Tooltip(
                   message: 'Send',
                   child: Material(
-                    color: can ? C.ink : C.surface,
+                    color: can ? C.brand : C.surface,
                     shape: const CircleBorder(),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
@@ -285,7 +285,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       child: SizedBox(
                         width: 48,
                         height: 48,
-                        child: Icon(Icons.arrow_upward_rounded, color: can ? C.onInk : C.muted, size: 22),
+                        child: Icon(Icons.arrow_upward_rounded, color: can ? C.onBrand : C.muted, size: 22),
                       ),
                     ),
                   ),
@@ -328,7 +328,7 @@ class _Bubble extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.76),
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
           decoration: BoxDecoration(
-            color: mine ? C.ink : C.surface,
+            color: mine ? C.brand : C.surface,
             borderRadius: BorderRadius.only(
               topLeft: round,
               topRight: round,
@@ -336,7 +336,7 @@ class _Bubble extends StatelessWidget {
               bottomRight: mine && endsRun ? tail : round,
             ),
           ),
-          child: Text(message.text, style: TextStyle(color: mine ? C.onInk : C.ink, fontSize: 16, height: 1.35)),
+          child: Text(message.text, style: TextStyle(color: mine ? C.onBrand : C.ink, fontSize: 16, height: 1.35)),
         ),
       ),
       if (endsRun)

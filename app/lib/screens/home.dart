@@ -10,7 +10,7 @@ import '../logic/profile.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/dots.dart';
+import '../widgets/art.dart';
 import '../widgets/sign_in_sheet.dart';
 import '../widgets/ui.dart';
 import 'check_in.dart';
@@ -175,12 +175,12 @@ class HomeTabBar extends StatelessWidget {
                   child: Tooltip(
                     message: 'Add an event or check in',
                     child: Material(
-                      color: C.ink,
+                      color: C.brand,
                       shape: const CircleBorder(),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap: () => _addSheet(context),
-                        child: SizedBox(width: 50, height: 50, child: Icon(Icons.add_rounded, size: 28, color: C.onInk)),
+                        child: SizedBox(width: 50, height: 50, child: Icon(Icons.add_rounded, size: 28, color: C.onBrand)),
                       ),
                     ),
                   ),
@@ -298,7 +298,7 @@ class _EventsTabState extends State<EventsTab> {
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
-        color: C.ink,
+        color: C.brand,
         backgroundColor: C.surface,
         onRefresh: _load,
         child: ListView(
@@ -444,7 +444,7 @@ class _Hint extends StatelessWidget {
       );
 }
 
-/// The event that's on right now, as a poster: a dotted room, its name, and one thing to do.
+/// The event that's on right now, as a poster: lit colour, its name, and one thing to do.
 class _EventPoster extends StatelessWidget {
   const _EventPoster({
     required this.id,
@@ -469,21 +469,16 @@ class _EventPoster extends StatelessWidget {
           child: Container(
             height: 196,
             clipBehavior: Clip.antiAlias,
-            foregroundDecoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0x1AFFFFFF)),
-            ),
             decoration: BoxDecoration(color: Poster.bg, borderRadius: BorderRadius.circular(28)),
             child: SizedBox(
               child: Stack(fit: StackFit.expand, children: [
-                Opacity(opacity: 0.5, child: Dots(roomField(id), step: 7, color: Poster.ink)),
+                PosterArt(id),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Color(0x8C000000), Color(0x00000000), Color(0xD9000000), Color(0xF2000000)],
-                      stops: [0, 0.3, 0.62, 1],
+                      colors: [Color(0x00000000), Color(0x59000000)],
                     ),
                   ),
                 ),
@@ -558,8 +553,8 @@ class _QuickAction extends StatelessWidget {
           Container(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(color: C.paper, shape: BoxShape.circle),
-            child: Icon(icon, size: 20, color: C.ink),
+            decoration: BoxDecoration(color: C.second, shape: BoxShape.circle),
+            child: Icon(icon, size: 20, color: C.onSecond),
           ),
           const SizedBox(height: 14),
           Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),

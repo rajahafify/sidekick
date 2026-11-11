@@ -32,6 +32,10 @@ void main() {
         expect(contrast(p.muted, p.paper), greaterThan(4.5), reason: 'muted on paper');
         expect(contrast(p.go, p.paper), greaterThan(4.5), reason: 'Signal text on paper');
         expect(contrast(p.danger, p.paper), greaterThan(4.5), reason: 'danger on paper');
+        expect(contrast(p.onBrand, p.brand), greaterThan(7), reason: 'label on the main colour');
+        expect(contrast(p.onSecond, p.second), greaterThan(7), reason: 'words on the secondary colour');
+        expect(contrast(p.go, p.second), greaterThan(4.5), reason: 'Signal text on the secondary colour');
+        expect(contrast(p.muted, p.second), greaterThan(4.5), reason: 'muted on the secondary colour');
       }
     });
 

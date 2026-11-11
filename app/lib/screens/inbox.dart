@@ -8,7 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/contact.dart';
-import '../widgets/dots.dart';
+import '../widgets/mark.dart';
 import '../widgets/sign_in_sheet.dart';
 import '../widgets/ui.dart';
 
@@ -45,7 +45,7 @@ class _TabPage extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          color: C.ink,
+          color: C.brand,
           backgroundColor: C.surface,
           onRefresh: onRefresh,
           child: ListView(
@@ -499,11 +499,11 @@ class _Row extends StatelessWidget {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: C.ink,
+                      color: C.brand,
                       shape: BoxShape.circle,
                       border: Border.all(color: C.paper, width: 2),
                     ),
-                    child: Icon(badge, size: 11, color: C.onInk),
+                    child: Icon(badge, size: 11, color: C.onBrand),
                   ),
                 ),
             ]),

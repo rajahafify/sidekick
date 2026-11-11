@@ -8,7 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/contact.dart';
-import '../widgets/dots.dart';
+import '../widgets/mark.dart';
 import '../widgets/ui.dart';
 
 /// A match: who they are, how to reach them, the opener, and what the two sidekicks said.
@@ -212,7 +212,7 @@ class _MatchScreenState extends State<MatchScreen> {
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
-                    decoration: BoxDecoration(color: C.goSoft, borderRadius: BorderRadius.circular(22)),
+                    decoration: BoxDecoration(color: C.second, borderRadius: BorderRadius.circular(22)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         const SidekickMark(size: 14, mood: BuddyMood.wink),

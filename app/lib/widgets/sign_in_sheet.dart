@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/identity.dart';
 import '../theme.dart';
-import 'dots.dart';
+import 'mark.dart';
 import 'google_button.dart';
 import 'ui.dart';
 

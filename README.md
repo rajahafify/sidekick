@@ -10,7 +10,7 @@ Everything runs on AWS, in one CDK stack.
 
 | Part | Where | What |
 |---|---|---|
-| App | `app/` | Flutter: the same app is the Android app and the website at sidekick.artifisi.com. Dark is white on black, light is black on white (each person picks, the admin sets the default). Halftone dots, Signal orange. |
+| App | `app/` | Flutter: the same app is the Android app and the website at sidekick.artifisi.com. Light is Pine green on warm paper, dark is Oat on deep Pine (each person picks, the admin sets the default). Signal orange is the accent. |
 | Identity | Cognito identity pool | A guest gets an unauthenticated identity. Google sign-in is linked to that same identity, so a guest keeps their data. Both get short-lived AWS credentials that can only call the API. |
 | API | API Gateway (HTTP API, IAM auth) → Lambda (`backend/src`) | One Node 22 Lambda. API Gateway checks each request's signature and tells the Lambda who is calling and whether they're a guest. |
 | Data | DynamoDB (one table, on demand) | Profiles, events, attendee cards, swipes, matches, the agents' exchange for each match (kept with the match), notes for the Alerts and Messages tabs, messages, and connections (the people you've connected with, across events). Layout in `backend/src/store.ts`. |

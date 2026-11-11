@@ -1,10 +1,9 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import 'dots.dart';
+import 'mark.dart';
 import 'ui.dart';
 
 /// The match moment: the whole screen goes dark, the two faces come together, and there is one
@@ -57,15 +56,6 @@ class _MatchMomentState extends State<_MatchMoment>
   }
 
   /// A burst of dots from the middle, fading at the edges.
-  static double _burst(Offset p, Size s) {
-    final c = Offset(s.width / 2, s.height * 0.27);
-    final d = (p - c).distance / (s.shortestSide * 0.95);
-    final a = math.atan2(p.dy - c.dy, p.dx - c.dx);
-    final rays = 0.5 + 0.5 * math.cos(a * 14);
-    return ((1 - d) * (0.25 + 0.6 * rays)).clamp(0.0, 1.0) *
-        (d > 0.2 ? 1 : d / 0.2);
-  }
-
   @override
   Widget build(BuildContext context) {
     final come = CurvedAnimation(
@@ -94,15 +84,18 @@ class _MatchMomentState extends State<_MatchMoment>
         fit: StackFit.expand,
         children: [
           FadeTransition(
-            opacity: Tween(begin: 0.0, end: 0.42).animate(
+            opacity: Tween(begin: 0.0, end: 0.5).animate(
               CurvedAnimation(parent: _c, curve: const Interval(0, 0.6)),
             ),
-            // The burst fades out above the words, so they stay easy to read.
-            child: const Dots(
-              _burst,
-              step: 9,
-              color: Poster.ink,
-              fade: (0.24, 0.46),
+            // A glow of Signal behind the two faces.
+            child: const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0, -0.5),
+                  radius: 0.95,
+                  colors: [signal, Color(0x00FF5A36)],
+                ),
+              ),
             ),
           ),
           SafeArea(
