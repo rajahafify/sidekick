@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sidekick/widgets/dots.dart';
+import 'package:sidekick/widgets/mark.dart';
 
 void main() {
   testWidgets('Buddy draws in every mood at its own aspect ratio', (tester) async {

@@ -12,7 +12,8 @@ import '../logic/sidekick.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/dots.dart';
+import '../widgets/art.dart';
+import '../widgets/mark.dart';
 import '../widgets/match_moment.dart';
 import '../widgets/room_share.dart';
 import '../widgets/sign_in_sheet.dart';
@@ -325,7 +326,7 @@ class _EventScreenState extends State<EventScreen> {
         ],
       ),
       body: RefreshIndicator(
-        color: C.ink,
+        color: C.brand,
         backgroundColor: C.surface,
         onRefresh: _load,
         child: ListView(
@@ -380,21 +381,20 @@ class _EventScreenState extends State<EventScreen> {
       child: ColoredBox(
         color: Poster.bg,
         child: Stack(children: [
-          Positioned.fill(child: Opacity(opacity: 0.45, child: Dots(roomField(widget.id), step: 7, color: Poster.ink))),
+          Positioned.fill(child: PosterArt(widget.id)),
           const Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0x33000000), Color(0xF2000000)],
-                  stops: [0, 0.6],
+                  colors: [Color(0x00000000), Color(0x66000000)],
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(22, 120, 22, 22),
+            padding: const EdgeInsets.fromLTRB(22, 96, 22, 22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -998,16 +998,15 @@ class _DeckTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: highlight ? C.goSoft : C.paper,
+          color: highlight ? C.second : C.paper,
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: highlight ? C.go.withValues(alpha: 0.45) : Colors.transparent),
-        ),
+          ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13.5,
             height: 1.1,
-            color: highlight ? C.go : C.ink,
+            color: highlight ? C.onSecond : C.ink,
             fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
           ),
         ),

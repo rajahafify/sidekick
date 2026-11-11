@@ -1,13 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import 'dots.dart';
+import 'art.dart';
+import 'mark.dart';
 
-/// A person's photo in black and white, or a dotted portrait until they have one.
-/// Small avatars show their initial instead, since dots don't read at that size.
+/// A person's photo, or their initial on colour until they have one: on their own poster colour
+/// when it's large, on the secondary colour when it's small.
 class Avatar extends StatelessWidget {
   const Avatar({super.key, required this.name, this.url = '', this.size = 44, this.seed, this.ring});
   final String name;
@@ -25,39 +24,26 @@ class Avatar extends StatelessWidget {
         ? SizedBox(
             width: size,
             height: size,
-            child: ClipOval(
-              child: ColoredBox(
-                color: Poster.bg,
-                child: Dots(
-                  portraitField(seed ?? name, headY: 0.4, scale: 1.1),
-                  step: math.max(3.0, size / 18),
-                  color: Poster.ink,
-                ),
-              ),
-            ),
+            child: ClipOval(child: PosterArt(seed ?? name, monogram: initial, monogramAt: Alignment.center)),
           )
         : Container(
             width: size,
             height: size,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: C.soft, shape: BoxShape.circle),
-            child: Text(initial, style: displayStyle(size * 0.5)),
+            decoration: BoxDecoration(color: C.second, shape: BoxShape.circle),
+            child: Text(initial, style: displayStyle(size * 0.5, color: C.onSecond)),
           );
     final Widget face = url.isEmpty
         ? fallback
         : ClipOval(
-            child: ColorFiltered(
-              colorFilter: grayscale,
-              child: Image.network(
-                url,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => fallback,
-                loadingBuilder: (_, child, progress) => progress == null
-                    ? child
-                    : Container(width: size, height: size, color: C.soft),
-              ),
+            child: Image.network(
+              url,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => fallback,
+              loadingBuilder: (_, child, progress) =>
+                  progress == null ? child : Container(width: size, height: size, color: C.soft),
             ),
           );
     return Align(
@@ -73,13 +59,6 @@ class Avatar extends StatelessWidget {
     );
   }
 }
-
-const grayscale = ColorFilter.matrix([
-  0.2126, 0.7152, 0.0722, 0, 0, //
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0, 0, 0, 1, 0,
-]);
 
 /// A few overlapping faces and a count: who's in the room.
 class AvatarStack extends StatelessWidget {
@@ -118,16 +97,16 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
     decoration: BoxDecoration(
-      color: highlight ? C.goSoft : C.surface,
+      color: highlight ? C.second : C.surface,
       borderRadius: BorderRadius.circular(99),
-      border: Border.all(color: highlight ? C.go.withValues(alpha: 0.45) : C.line),
+      border: Border.all(color: highlight ? C.second : C.line),
     ),
     child: Text(
       label,
       style: TextStyle(
         fontSize: 13.5,
         height: 1.1,
-        color: highlight ? C.go : C.ink,
+        color: highlight ? C.onSecond : C.ink,
         fontWeight: highlight ? FontWeight.w600 : FontWeight.w400,
       ),
     ),
@@ -200,8 +179,8 @@ class EmptyState extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            decoration: BoxDecoration(color: C.surface, shape: BoxShape.circle),
-            child: Icon(icon, color: C.ink, size: 26),
+            decoration: BoxDecoration(color: C.second, shape: BoxShape.circle),
+            child: Icon(icon, color: C.onSecond, size: 26),
           ),
           const SizedBox(height: 20),
         ],
@@ -225,7 +204,7 @@ class Loading extends StatelessWidget {
   const Loading({super.key});
   @override
   Widget build(BuildContext context) => Center(
-    child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: C.ink)),
+    child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: C.brand)),
   );
 }
 
@@ -234,7 +213,7 @@ class ButtonProgress extends StatelessWidget {
   final Color? color;
   @override
   Widget build(BuildContext context) =>
-      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: color ?? C.onInk));
+      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: color ?? C.onBrand));
 }
 
 void haptic() => HapticFeedback.lightImpact();
@@ -423,7 +402,7 @@ class Segments<T> extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: dense ? 7 : 11, horizontal: dense ? 14 : 8),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: v == value ? C.ink : Colors.transparent,
+                      color: v == value ? C.brand : Colors.transparent,
                       borderRadius: BorderRadius.circular(99),
                     ),
                     child: Text(
@@ -433,7 +412,7 @@ class Segments<T> extends StatelessWidget {
                       style: TextStyle(
                         fontSize: dense ? 13 : 15,
                         fontWeight: FontWeight.w500,
-                        color: v == value ? C.onInk : C.muted,
+                        color: v == value ? C.onBrand : C.muted,
                       ),
                     ),
                   ),
@@ -577,7 +556,7 @@ class SidekickNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        decoration: BoxDecoration(color: C.goSoft, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: C.second, borderRadius: BorderRadius.circular(20)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             SidekickMark(size: 14, mood: mood),
@@ -586,7 +565,7 @@ class SidekickNote extends StatelessWidget {
             if (busy) SizedBox(width: 11, height: 11, child: CircularProgressIndicator(strokeWidth: 1.5, color: C.go)),
           ]),
           const SizedBox(height: 8),
-          Text(text, style: const TextStyle(fontSize: 16, height: 1.45)),
+          Text(text, style: TextStyle(fontSize: 16, height: 1.45, color: C.onSecond)),
         ]),
       );
 }
@@ -609,12 +588,11 @@ class DateTile extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: live ? C.ink : C.paper,
+        color: live ? C.brand : C.second,
         borderRadius: BorderRadius.circular(15),
-        border: live ? null : Border.all(color: C.line),
       ),
       child: d == null || icon != null
-          ? Icon(icon ?? Icons.event_outlined, size: 21, color: live ? C.onInk : C.ink)
+          ? Icon(icon ?? Icons.event_outlined, size: 21, color: live ? C.onBrand : C.onSecond)
           : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text(
                 _months[d.month - 1],
@@ -623,18 +601,18 @@ class DateTile extends StatelessWidget {
                   height: 1,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1,
-                  color: live ? C.onInk.withValues(alpha: 0.7) : C.muted,
+                  color: (live ? C.onBrand : C.onSecond).withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 3),
-              Text('${d.day}', style: displayStyle(23, color: live ? C.onInk : C.ink)),
+              Text('${d.day}', style: displayStyle(23, color: live ? C.onBrand : C.onSecond)),
             ]),
     );
   }
 }
 
-/// A person as a poster: their photo in black and white (or their dotted portrait), fading to
-/// black at the bottom so white words can sit on it.
+/// A person as a poster: their photo, or their initials on their own colour, deepening at the
+/// bottom so light words can sit on it.
 class PortraitPoster extends StatelessWidget {
   const PortraitPoster({
     super.key,
@@ -660,45 +638,34 @@ class PortraitPoster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dots = LayoutBuilder(
-      builder: (_, c) => Opacity(
-        opacity: 0.85,
-        child: Dots(
-          portraitField(seed, headY: 0.34, scale: 0.95),
-          step: math.max(4.5, c.maxWidth / 64),
-          color: Poster.ink,
-        ),
-      ),
-    );
-    return DecoratedBox(
-      position: DecorationPosition.foreground,
-      // A hairline, so the poster doesn't melt into a black page.
-      decoration: BoxDecoration(border: Border.all(color: const Color(0x1AFFFFFF)), borderRadius: radius),
-      child: ClipRRect(
-        borderRadius: radius ?? BorderRadius.zero,
-        child: ColoredBox(
-          color: Poster.bg,
-          child: Stack(fit: StackFit.expand, children: [
-            if (url.isEmpty)
-              dots
-            else
-              ColorFiltered(
-                colorFilter: grayscale,
-                child: Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => dots),
-              ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: const [Color(0x66000000), Color(0x00000000), Color(0x00000000), Color(0xD9000000), Color(0xF2000000)],
-                  stops: [0, 0.2, scrim * 0.7, scrim + (1 - scrim) * 0.45, 1],
-                ),
+    final art = PosterArt(seed, monogram: initialsOf(name), monogramAt: Alignment(0, scrim - 0.95));
+    final (_, deep) = toneOf(seed);
+    // A photo needs a darker fade than flat colour does.
+    final under = url.isEmpty ? deep : const Color(0xFF07110C);
+    return ClipRRect(
+      borderRadius: radius ?? BorderRadius.zero,
+      child: ColoredBox(
+        color: Poster.bg,
+        child: Stack(fit: StackFit.expand, children: [
+          if (url.isEmpty) art else Image.network(url, fit: BoxFit.cover, errorBuilder: (_, _, _) => art),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  under.withValues(alpha: 0.4),
+                  under.withValues(alpha: 0),
+                  under.withValues(alpha: 0),
+                  under.withValues(alpha: 0.85),
+                  under.withValues(alpha: 0.96),
+                ],
+                stops: [0, 0.2, scrim * 0.7, scrim + (1 - scrim) * 0.45, 1],
               ),
             ),
-            ?child,
-          ]),
-        ),
+          ),
+          ?child,
+        ]),
       ),
     );
   }
@@ -773,7 +740,7 @@ class Nudge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: C.goSoft,
+        color: C.second,
         borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -783,7 +750,7 @@ class Nudge extends StatelessWidget {
             child: Row(children: [
               const SidekickMark(size: 18),
               const SizedBox(width: 12),
-              Expanded(child: Text(text, style: const TextStyle(fontSize: 14.5, height: 1.35))),
+              Expanded(child: Text(text, style: TextStyle(fontSize: 14.5, height: 1.35, color: C.onSecond))),
               const SizedBox(width: 10),
               Text(action, style: TextStyle(color: C.go, fontWeight: FontWeight.w600, fontSize: 14.5)),
             ]),

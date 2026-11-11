@@ -17,7 +17,7 @@ import 'screens/new_event.dart';
 import 'screens/profile.dart';
 import 'screens/welcome.dart';
 import 'theme.dart';
-import 'widgets/dots.dart';
+import 'widgets/mark.dart';
 import 'widgets/ui.dart';
 
 Future<void> main() async {

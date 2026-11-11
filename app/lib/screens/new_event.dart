@@ -6,7 +6,7 @@ import '../logic/geo_when.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/dots.dart';
+import '../widgets/mark.dart';
 import '../widgets/place_field.dart';
 import '../widgets/ui.dart';
 
@@ -122,7 +122,7 @@ class _NewEventScreenState extends State<NewEventScreen> {
             ),
             const SizedBox(height: 24),
             SurfaceCard(
-              color: C.goSoft,
+              color: C.second,
               padding: const EdgeInsets.all(18),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 Row(children: [

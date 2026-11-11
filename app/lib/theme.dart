@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 
 import 'models.dart';
 
-/// The colours of one look. Dark is white on pure black, light is black on white. Both share one
-/// accent (Signal), kept for the moments that matter: Connect, the sidekick's pick, live events and
-/// matches. Images are halftone dots (widgets/dots.dart), so they follow the ink colour.
+/// The colours of one look. Three colours do the work:
+///
+/// * Pine, the main colour: the page ink, the main buttons, the picture cards.
+/// * Oat, the secondary: a warm neutral that sits beside Pine, for tinted cards, tiles and chips.
+/// * Signal, the accent: kept for the moments that matter (Connect, live, unread, a match).
+///
+/// Light is Pine on warm paper with Oat tints. Dark swaps them: Oat on deep Pine.
 class Palette {
   const Palette({
     required this.brightness,
@@ -16,6 +20,10 @@ class Palette {
     required this.ink,
     required this.onInk,
     required this.muted,
+    required this.brand,
+    required this.onBrand,
+    required this.second,
+    required this.onSecond,
     required this.go,
     required this.goSoft,
     required this.danger,
@@ -30,44 +38,64 @@ class Palette {
   final Color ink;
   final Color onInk;
   final Color muted;
+
+  /// The main colour as a fill (the main button, a picked choice), and what is written on it.
+  final Color brand;
+  final Color onBrand;
+
+  /// The secondary colour as a fill (a tinted card, a date tile, a face with no photo).
+  final Color second;
+  final Color onSecond;
   final Color go;
   final Color goSoft;
   final Color danger;
 
-  /// The soft shadow under raised things (the tab bar, the deck). Barely there on black.
+  /// The soft shadow under raised things (the tab bar, the deck). Barely there on dark.
   final Color shadow;
 
   static const dark = Palette(
     brightness: Brightness.dark,
-    paper: Color(0xFF000000),
-    surface: Color(0xFF101010),
-    soft: Color(0xFF1B1B1B),
-    line: Color(0xFF262626),
-    ink: Color(0xFFFFFFFF),
-    onInk: Color(0xFF000000),
-    muted: Color(0xFF9A9A9A),
-    go: Color(0xFFFF5A36),
-    goSoft: Color(0xFF26110B),
+    paper: Color(0xFF08130E),
+    surface: Color(0xFF101E17),
+    soft: Color(0xFF192B21),
+    line: Color(0xFF24382C),
+    ink: Color(0xFFF6F2EA),
+    onInk: Color(0xFF08130E),
+    muted: Color(0xFF93A69B),
+    brand: oat,
+    onBrand: Color(0xFF0E2E21),
+    second: Color(0xFF14382A),
+    onSecond: Color(0xFFF6F2EA),
+    go: Color(0xFFFF6B49),
+    goSoft: Color(0xFF2C160E),
     danger: Color(0xFFFF8A80),
     shadow: Color(0x00000000),
   );
 
   static const light = Palette(
     brightness: Brightness.light,
-    paper: Color(0xFFFFFFFF),
-    surface: Color(0xFFF6F5F2),
-    soft: Color(0xFFECEAE6),
-    line: Color(0xFFE4E2DD),
-    ink: Color(0xFF0A0A0A),
-    onInk: Color(0xFFFFFFFF),
-    muted: Color(0xFF6B6863),
-    // Signal for text, deep enough to pass 4.5:1 on white. Fills use [signal] itself.
-    go: Color(0xFFCF3A1A),
-    goSoft: Color(0xFFFCEBE5),
+    paper: Color(0xFFFBF9F4),
+    surface: Color(0xFFF4EFE5),
+    soft: Color(0xFFEAE4D6),
+    line: Color(0xFFDFD8C8),
+    ink: Color(0xFF10261C),
+    onInk: Color(0xFFFBF9F4),
+    muted: Color(0xFF5C6A61),
+    brand: pine,
+    onBrand: Color(0xFFFBF9F4),
+    second: oat,
+    onSecond: pine,
+    // Signal for text, deep enough to pass 4.5:1 on paper. Fills use [signal] itself.
+    go: Color(0xFFB8300C),
+    goSoft: Color(0xFFFBE7DF),
     danger: Color(0xFFB3261E),
-    shadow: Color(0x1F000000),
+    shadow: Color(0x24102A1E),
   );
 }
+
+/// The three named colours.
+const pine = Color(0xFF12402E);
+const oat = Color(0xFFEDE4D3);
 
 /// The colours in use right now. Screens read them as they build. [C.use] switches the whole app;
 /// main.dart rebuilds the app when that happens.
@@ -84,26 +112,30 @@ class C {
   static Color get ink => _p.ink;
   static Color get onInk => _p.onInk;
   static Color get muted => _p.muted;
+  static Color get brand => _p.brand;
+  static Color get onBrand => _p.onBrand;
+  static Color get second => _p.second;
+  static Color get onSecond => _p.onSecond;
   static Color get go => _p.go;
   static Color get goSoft => _p.goSoft;
   static Color get danger => _p.danger;
   static Color get shadow => _p.shadow;
 }
 
-/// Signal, the one accent, as a fill: the Connect button, the live dot, an unread dot. The same in
-/// both looks, and its label is always black (white on Signal is too faint to read).
+/// Signal, the accent, as a fill: the Connect button, the live dot, an unread dot. The same in
+/// both looks, and its label is always dark (white on Signal is too faint to read).
 const signal = Color(0xFFFF5A36);
-const onSignal = Color(0xFF0A0A0A);
+const onSignal = Color(0xFF0B1A13);
 
-/// A poster is a person's or event's picture card: always a dark picture with white words on it,
-/// in both looks, the way a photo is.
+/// A poster is a person's or event's picture card: always deep Pine with Oat words on it, in both
+/// looks, the way a photo is.
 class Poster {
-  static const bg = Color(0xFF0B0B0B);
-  static const ink = Color(0xFFFFFFFF);
-  static const muted = Color(0xFFBDBDBD);
+  static const bg = Color(0xFF0E2E21);
+  static const ink = Color(0xFFFBF9F4);
+  static const muted = Color(0xFFC6D2C9);
   /// A dark pane over the picture, for a chip, a note or a round button that must stay readable.
-  static const glass = Color(0xA6101010);
-  static const edge = Color(0x33FFFFFF);
+  static const glass = Color(0xA608130E);
+  static const edge = Color(0x33FBF9F4);
 }
 
 /// Light or dark for a choice, once "system" is resolved against the phone or browser.
@@ -168,10 +200,10 @@ ThemeData buildTheme(Palette p) {
     pageTransitionsTheme: PageTransitionsTheme(
       builders: {for (final t in TargetPlatform.values) t: const CupertinoPageTransitionsBuilder()},
     ),
-    progressIndicatorTheme: ProgressIndicatorThemeData(color: p.ink),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: p.brand),
     switchTheme: SwitchThemeData(
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.ink : p.soft),
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onInk : p.muted),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.brand : p.soft),
+      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onBrand : p.muted),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     listTileTheme: ListTileThemeData(iconColor: p.ink, textColor: p.ink),
@@ -198,8 +230,8 @@ ThemeData buildTheme(Palette p) {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: p.ink,
-        foregroundColor: p.onInk,
+        backgroundColor: p.brand,
+        foregroundColor: p.onBrand,
         disabledBackgroundColor: p.soft,
         disabledForegroundColor: p.muted,
         minimumSize: const Size.fromHeight(54),
@@ -224,8 +256,8 @@ ThemeData buildTheme(Palette p) {
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: ButtonStyle(
-        backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.ink : p.surface),
-        foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onInk : p.ink),
+        backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.brand : p.surface),
+        foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onBrand : p.ink),
         side: WidgetStateProperty.all(BorderSide(color: p.line)),
         textStyle: WidgetStateProperty.all(const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
       ),
@@ -239,14 +271,14 @@ ThemeData buildTheme(Palette p) {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.line)),
       enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.line)),
-      focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.ink, width: 1.4)),
+      focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.brand, width: 1.4)),
       errorBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.danger)),
       focusedErrorBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: p.danger, width: 1.4)),
       floatingLabelStyle: TextStyle(color: p.muted),
     ),
     chipTheme: base.chipTheme.copyWith(
       backgroundColor: p.surface,
-      selectedColor: p.goSoft,
+      selectedColor: p.second,
       side: BorderSide(color: p.line),
       labelStyle: TextStyle(fontSize: 14, color: p.ink),
       shape: const StadiumBorder(),
@@ -269,8 +301,8 @@ ThemeData buildTheme(Palette p) {
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: p.ink,
-      contentTextStyle: TextStyle(fontFamily: 'Inter', color: p.onInk, fontSize: 15, fontWeight: FontWeight.w500),
+      backgroundColor: p.brightness == Brightness.light ? pine : p.soft,
+      contentTextStyle: TextStyle(fontFamily: 'Inter', color: Poster.ink, fontSize: 15, fontWeight: FontWeight.w500),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

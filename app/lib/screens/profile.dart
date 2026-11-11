@@ -8,7 +8,7 @@ import '../logic/image.dart';
 import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
-import '../widgets/dots.dart';
+import '../widgets/mark.dart';
 import '../widgets/ui.dart';
 
 /// Your profile: what your sidekick tells other sidekicks, and your contact details, which are
@@ -195,16 +195,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: C.ink,
+                          color: C.brand,
                           shape: BoxShape.circle,
                           border: Border.all(color: C.paper, width: 3),
                         ),
                         child: uploading
                             ? Padding(
                                 padding: const EdgeInsets.all(8),
-                                child: CircularProgressIndicator(strokeWidth: 2, color: C.onInk),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: C.onBrand),
                               )
-                            : Icon(Icons.photo_camera_outlined, size: 16, color: C.onInk),
+                            : Icon(Icons.photo_camera_outlined, size: 16, color: C.onBrand),
                       ),
                     ),
                   ]),
@@ -339,7 +339,7 @@ class _TagPicker extends StatelessWidget {
       );
 }
 
-/// One tag in a picker: black when picked.
+/// One tag in a picker: filled with the main colour when picked.
 class _Choice extends StatelessWidget {
   const _Choice({required this.label, required this.on, required this.enabled, required this.onTap});
   final String label;
@@ -356,14 +356,14 @@ class _Choice extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(color: on ? C.ink : C.surface, borderRadius: BorderRadius.circular(99)),
+            decoration: BoxDecoration(color: on ? C.brand : C.surface, borderRadius: BorderRadius.circular(99)),
             child: Text(
               label,
               style: TextStyle(
                 fontSize: 14.5,
                 height: 1.1,
                 fontWeight: on ? FontWeight.w500 : FontWeight.w400,
-                color: on ? C.onInk : (enabled ? C.ink : C.muted.withValues(alpha: 0.6)),
+                color: on ? C.onBrand : (enabled ? C.ink : C.muted.withValues(alpha: 0.6)),
               ),
             ),
           ),
