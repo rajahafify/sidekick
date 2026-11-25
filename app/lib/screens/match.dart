@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/contact.dart';
+import '../widgets/conversation.dart';
 import '../widgets/mark.dart';
 import '../widgets/ui.dart';
 
@@ -285,7 +286,7 @@ class _MatchScreenState extends State<MatchScreen> {
                               padding: const EdgeInsets.only(top: 8),
                               child: Column(children: [
                                 for (final t in d.exchange.turns)
-                                  _Bubble(
+                                  TalkBubble(
                                     mine: t.speaker != widget.other,
                                     who: t.speaker != widget.other ? 'Your sidekick' : '$name’s sidekick',
                                     text: t.text,
@@ -313,35 +314,4 @@ class _MatchScreenState extends State<MatchScreen> {
       ]),
     );
   }
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.mine, required this.who, required this.text});
-  final bool mine;
-  final String who;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 11),
-          decoration: BoxDecoration(
-            color: C.surface,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(18),
-              topRight: const Radius.circular(18),
-              bottomLeft: Radius.circular(mine ? 18 : 5),
-              bottomRight: Radius.circular(mine ? 5 : 18),
-            ),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(who.toUpperCase(), style: caps.copyWith(fontSize: 10)),
-            const SizedBox(height: 4),
-            Text(text, style: const TextStyle(fontSize: 15, height: 1.4)),
-          ]),
-        ),
-      );
 }

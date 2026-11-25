@@ -364,6 +364,78 @@ describe('the agents\' conversation', () => {
   });
 });
 
+describe('the conversation before a swipe', () => {
+  const dave: Identity = { id: 'ap-southeast-1:dave', guest: false };
+  const talk = (who: string) => `/events/${EVENT}/people/${encodeURIComponent(who)}/conversation`;
+  let EVENT = '';
+  const llm = (opener: string) =>
+    JSON.stringify({
+      turns: [
+        { speaker: 'A', text: 'You build payments too?' },
+        { speaker: 'B', text: 'Yes, for clinics.' },
+      ],
+      reason: 'Both build payments.',
+      opener,
+    });
+
+  it('lets someone read the conversation before they swipe, and a match reads the same one', async () => {
+    let calls = 0;
+    const s = setup({
+      model: async () => {
+        calls++;
+        return { text: llm('Ask Bob about clinic billing.') };
+      },
+    });
+    EVENT = await room(s, [alice, bob]);
+    const before = await s.call(alice, 'GET', talk(bob.id));
+    expect(before.status).toBe(200);
+    expect(before.body.exchange).toMatchObject({ source: 'llm', opener: 'Ask Bob about clinic billing.' });
+    expect(JSON.stringify(before.body)).not.toContain('linkedin');
+
+    await s.call(alice, 'POST', `/events/${EVENT}/swipe`, { to: bob.id, like: true });
+    await s.call(bob, 'POST', `/events/${EVENT}/swipe`, { to: alice.id, like: true });
+    const match = await s.call(alice, 'GET', `/events/${EVENT}/matches/${encodeURIComponent(bob.id)}`);
+    expect(match.body.exchange).toEqual(before.body.exchange);
+    expect(calls).toBe(1);
+  });
+
+  it('shows nothing about swipes, and only to people checked in and not blocked', async () => {
+    const s = setup();
+    EVENT = await room(s, [alice, bob, carol]);
+    await s.call(alice, 'POST', `/events/${EVENT}/swipe`, { to: bob.id, like: false });
+    // Bob sees the same conversation about Alice whether or not Alice passed him.
+    const bobSeesAlice = await s.call(bob, 'GET', talk(alice.id));
+    expect(bobSeesAlice.status).toBe(200);
+    expect(JSON.stringify(bobSeesAlice.body)).not.toMatch(/like|swipe|pass/i);
+
+    expect((await s.call(dave, 'GET', talk(alice.id))).status).toBe(403);
+    expect((await s.call(alice, 'GET', talk(dave.id))).status).toBe(404);
+    expect((await s.call(alice, 'GET', talk(alice.id))).status).toBe(400);
+
+    await s.call(bob, 'POST', `/events/${EVENT}/visible`, { visible: false });
+    expect((await s.call(alice, 'GET', talk(bob.id))).status).toBe(404);
+    await s.call(bob, 'POST', `/events/${EVENT}/visible`, { visible: true });
+
+    await s.call(alice, 'POST', '/block', { uid: carol.id });
+    expect((await s.call(alice, 'GET', talk(carol.id))).status).toBe(404);
+    expect((await s.call(carol, 'GET', talk(alice.id))).status).toBe(404);
+  });
+
+  it('does not keep a fallback, so a later model answer is still possible', async () => {
+    let up = false;
+    const s = setup({
+      model: async () => (up ? { text: llm('Ask about the pilot.') } : { text: null, error: 'model is down' }),
+    });
+    EVENT = await room(s, [alice, bob]);
+    const first = await s.call(alice, 'GET', talk(bob.id));
+    expect(first.body.exchange.source).toBe('template');
+    up = true;
+    const second = await s.call(alice, 'GET', talk(bob.id));
+    expect(second.body.exchange).toMatchObject({ source: 'llm', opener: 'Ask about the pilot.' });
+    expect((await s.call(bob, 'GET', talk(alice.id))).body.exchange).toEqual(second.body.exchange);
+  });
+});
+
 describe('alerts and messages', () => {
   const matched = async (s: ReturnType<typeof setup>) => {
     const id = await room(s, [alice, bob, carol]);

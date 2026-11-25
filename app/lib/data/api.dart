@@ -160,6 +160,10 @@ class Api {
   Future<bool> swipe(String id, String to, bool like) async =>
       (await _send('POST', '/events/${Uri.encodeComponent(id)}/swipe', {'to': to, 'like': like}))['match'] == true;
 
+  /// What the two sidekicks would say about someone in the room, before I swipe on them.
+  Future<Exchange> conversation(String id, String uid) async => Exchange.fromJson(_map(
+      (await _send('GET', '/events/${Uri.encodeComponent(id)}/people/${Uri.encodeComponent(uid)}/conversation'))['exchange']));
+
   Future<MatchDetails> match(String id, String other) async => MatchDetails.fromMap(
       await _send('GET', '/events/${Uri.encodeComponent(id)}/matches/${Uri.encodeComponent(other)}'));
 
