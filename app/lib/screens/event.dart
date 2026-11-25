@@ -13,6 +13,7 @@ import '../main.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/art.dart';
+import '../widgets/conversation.dart';
 import '../widgets/mark.dart';
 import '../widgets/match_moment.dart';
 import '../widgets/room_share.dart';
@@ -155,6 +156,17 @@ class _EventScreenState extends State<EventScreen> {
     );
     if (ok) await _load(quiet: true);
     return ok && mounted;
+  }
+
+  /// Before swiping: the two sidekicks' conversation about this person, read in a sheet.
+  void _showConversation(Attendee me, Attendee p) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: C.paper,
+      builder: (_) => ConversationSheet(api: api, eventId: widget.id, me: me, person: p),
+    );
   }
 
   Future<void> _swipe(Attendee p, bool like) async {
@@ -523,6 +535,7 @@ class _EventScreenState extends State<EventScreen> {
             onUndo: canUndo ? _undo : null,
             canSwipe: (like) => _canSwipe(deck.first.person, like),
             onSwipe: (like) => _swipe(deck.first.person, like),
+            onReadConversation: () => _showConversation(me, deck.first.person),
           ),
         ],
         if (deck.isEmpty && canUndo)
@@ -683,6 +696,7 @@ class _Deck extends StatefulWidget {
     required this.onUndo,
     required this.canSwipe,
     required this.onSwipe,
+    required this.onReadConversation,
   });
   final Attendee person;
   final ScoutPick pick;
@@ -694,6 +708,7 @@ class _Deck extends StatefulWidget {
   final VoidCallback? onUndo;
   final Future<bool> Function(bool like) canSwipe;
   final ValueChanged<bool> onSwipe;
+  final VoidCallback onReadConversation;
 
   @override
   State<_Deck> createState() => _DeckState();
@@ -948,6 +963,13 @@ class _DeckState extends State<_Deck> with TickerProviderStateMixin {
         'Nobody sees a pass. Contacts swap only if you both connect.',
         textAlign: TextAlign.center,
         style: TextStyle(color: C.muted, fontSize: 12.5),
+      ),
+      Center(
+        child: TextButton.icon(
+          onPressed: widget.onReadConversation,
+          icon: Icon(Icons.forum_outlined, size: 18, color: C.ink),
+          label: Text('How would the sidekicks talk?', style: TextStyle(color: C.ink)),
+        ),
       ),
       if (p.about.isNotEmpty || p.lookingFor.isNotEmpty || p.offering.isNotEmpty) ...[
         const SizedBox(height: 22),

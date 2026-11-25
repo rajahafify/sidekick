@@ -323,6 +323,7 @@ export class App {
       if (is('POST', 'events', '*', 'scout')) return this.scout(me, id);
       if (is('POST', 'events', '*', 'swipe')) return this.swipe(me, id, body);
       if (is('GET', 'events', '*', 'matches', '*')) return this.match(me, id, parts[3]);
+      if (is('GET', 'events', '*', 'people', '*', 'conversation')) return this.conversation(me, id, parts[3]);
     }
     return fail(404, 'Not found.');
   }
@@ -815,8 +816,31 @@ export class App {
     };
   }
 
-  /** The agents' conversation for a match. It's made once, on first view, and kept with the match for good. */
-  private async exchangeFor(eventId: string, a: Card, b: Card): Promise<Exchange> {
+  /**
+   * What someone in the room would be told, before I swipe on them. Same conversation a match reads
+   * later, so it's kept once for both people. It's made from the two profiles only: nothing about
+   * whether either of us has swiped, and no contact details.
+   */
+  private async conversation(me: Identity, id: string, other: string) {
+    if (other === me.id) fail(400, 'Invalid request.');
+    const [mine, theirs] = await Promise.all([
+      this.store.get(`EVENT#${id}`, `ATT#${me.id}`),
+      this.store.get(`EVENT#${id}`, `ATT#${other}`),
+    ]);
+    if (!mine) fail(403, 'Join the event first.');
+    if (!theirs || theirs.visible === false) fail(404, 'This person has left the event.');
+    const blocked =
+      (await this.store.get(`USER#${me.id}`, `BLOCK#${other}`)) || (await this.store.get(`USER#${other}`, `BLOCK#${me.id}`));
+    if (blocked) fail(404, 'This person has left the event.');
+    return { exchange: await this.exchangeFor(id, cardOut(mine!), cardOut(theirs!), { keepFallback: false }) };
+  }
+
+  /**
+   * The agents' conversation for two people. It's made once and kept for good. A match always keeps
+   * whatever it got; a preview (`keepFallback: false`) only keeps a model conversation, so a busy
+   * quota doesn't lock the template in for a pair that might later get a real one.
+   */
+  private async exchangeFor(eventId: string, a: Card, b: Card, opts: { keepFallback?: boolean } = {}): Promise<Exchange> {
     const pk = `EVENT#${eventId}`;
     const sk = exchangeKey(a.uid, b.uid);
     const kept = await this.store.get(pk, sk);
@@ -828,6 +852,7 @@ export class App {
       ex = text ? parseLlmExchange(text, a, b) : null;
     }
     ex ??= templateExchange(a, b);
+    if (opts.keepFallback === false && ex.source !== 'llm') return ex;
     // First write wins, so both people always read the same conversation.
     if (await this.store.create({ pk, sk, exchange: ex, createdAt: this.nowIso() })) return ex;
     return ((await this.store.get(pk, sk))?.exchange ?? ex) as Exchange;

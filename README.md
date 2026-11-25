@@ -28,7 +28,7 @@ Everything runs on AWS, in one CDK stack.
 - Connections (the Connected tab) are only shown to the two people in them. They're kept across events, so a later event doesn't ask you to connect again, and they go when the event they were made at is deleted or either account is deleted.
 - Guests can't swipe or see matches.
 - Messages go only between two people who matched, and not once either side has blocked the other. Alerts and the message list go only to the person they're about.
-- A match's agent exchange is made once, on first view, and kept with the match.
+- The agents' conversation about someone can be read before you swipe (the deck's "How would the sidekicks talk?"). It's made from the two profiles only, so it says nothing about who has swiped, and it's kept once for both people, so the match shows the same one. Only a model conversation is kept; a fallback is made again next time.
 - Prototype: places and events don't check where anyone is. Anyone can check in or join from anywhere. A real presence check (a rotating venue code, or stricter location) is an open decision before the first real event.
 
 ## Local development
